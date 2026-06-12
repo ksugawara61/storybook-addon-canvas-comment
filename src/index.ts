@@ -3,8 +3,9 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { mergeConfig, type Plugin, type UserConfig } from "vite";
+import { isCanvasComment, readCanvasCommentStatus } from "./comment-schema.ts";
 import { API_PATH, STORAGE_RELATIVE_PATH } from "./constants.ts";
-import type { CanvasComment, CanvasCommentStatus } from "./types.ts";
+import type { CanvasComment } from "./types.ts";
 
 const managerEntry = fileURLToPath(new URL("./manager.tsx", import.meta.url));
 const previewEntry = fileURLToPath(new URL("./preview.ts", import.meta.url));
@@ -113,7 +114,7 @@ async function handleItemRequest(
   }
 
   const body = await readBody(req);
-  const nextStatus = readStatus(body);
+  const nextStatus = readCanvasCommentStatus(body);
 
   if (!id || !nextStatus) {
     json(res, 400, { error: "Invalid canvas comment status payload" });
@@ -183,66 +184,6 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
 
   const raw = Buffer.concat(chunks).toString("utf8");
   return raw ? (JSON.parse(raw) as unknown) : undefined;
-}
-
-function readStatus(value: unknown): CanvasCommentStatus | undefined {
-  if (!isRecord(value)) {
-    return undefined;
-  }
-
-  return value.status === "open" || value.status === "resolved"
-    ? value.status
-    : undefined;
-}
-
-function isCanvasComment(value: unknown): value is CanvasComment {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  return (
-    typeof value.id === "string" &&
-    typeof value.storyId === "string" &&
-    typeof value.storyTitle === "string" &&
-    typeof value.storyName === "string" &&
-    typeof value.note === "string" &&
-    typeof value.selector === "string" &&
-    isRect(value.rect) &&
-    isPoint(value.pointer) &&
-    isViewport(value.viewport) &&
-    typeof value.createdAt === "string" &&
-    (value.status === "open" || value.status === "resolved")
-  );
-}
-
-function isRect(value: unknown): value is CanvasComment["rect"] {
-  return (
-    isRecord(value) &&
-    typeof value.x === "number" &&
-    typeof value.y === "number" &&
-    typeof value.width === "number" &&
-    typeof value.height === "number"
-  );
-}
-
-function isPoint(value: unknown): value is CanvasComment["pointer"] {
-  return (
-    isRecord(value) &&
-    typeof value.x === "number" &&
-    typeof value.y === "number"
-  );
-}
-
-function isViewport(value: unknown): value is CanvasComment["viewport"] {
-  return (
-    isRecord(value) &&
-    typeof value.width === "number" &&
-    typeof value.height === "number"
-  );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }
 
 function json(res: ServerResponse, statusCode: number, value: unknown) {

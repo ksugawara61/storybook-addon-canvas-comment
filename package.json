@@ -1,12 +1,15 @@
 {
   "devDependencies": {
+    "@playwright/test": "catalog:",
     "@storybook/icons": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "react": "catalog:",
     "storybook": "catalog:",
+    "tsx": "catalog:",
     "typescript": "catalog:",
-    "vite": "catalog:"
+    "vite": "catalog:",
+    "vitest": "catalog:"
   },
   "exports": {
     ".": "./src/index.ts",
@@ -21,6 +24,8 @@
   "name": "storybook-addon-canvas-comments",
   "private": true,
   "scripts": {
+    "dom-map": "tsx src/cli/dom-map.ts",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "type": "module",

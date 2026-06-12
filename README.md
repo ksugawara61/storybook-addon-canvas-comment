@@ -74,6 +74,35 @@ DELETE /__canvas-comments/comments/:id
 
 addon の保存 API への fetch は `Accept: msw/passthrough` を付けて送信します。`msw-storybook-addon` を使っている story でも、`POST /__canvas-comments/comments` が unhandled request warning にならず、Storybook dev server の middleware へそのまま届きます。
 
+## CLI
+
+Storybook dev server が起動している状態で、保存済みコメントと canvas 内の実 DOM を対応付けた JSON を出力できます。
+
+```bash
+pnpm --filter storybook-addon-canvas-comments dom-map -- \
+  --storybook-url http://localhost:6006 \
+  --story-id features-bookmark-list--success
+```
+
+`--story-id` を省略すると、コメントがある story をすべて処理します。既定では `open` コメントのみを対象にします。
+
+```bash
+pnpm --filter storybook-addon-canvas-comments dom-map -- \
+  --storybook-url http://localhost:6006 \
+  --status all \
+  --viewport 390x844 \
+  --include-dom-tree
+```
+
+CLI は次の順でコメント対象を解決します。
+
+1. 保存済み `selector` を `document.querySelector` で解決
+2. 解決できない場合、保存時 viewport から現在 viewport に pointer を scale し、`document.elementsFromPoint` で fallback
+
+出力には comment の保存座標、現在座標、対応 DOM 要素の tag / attributes / rect / text / ancestor 情報が含まれます。`--include-dom-tree` を付けると、`#storybook-root` 配下の bounded DOM tree も含めます。
+
+DOM 取得前には `role="progressbar"`、`loading` / `spinner` / `skeleton` 系の属性、`読み込み中` / `Loading` テキストが消えるまで待機します。Loading 状態そのものの story を調べる場合は `--skip-loading-wait` を指定します。
+
 ## JSON Schema
 
 AI エージェントが読む前提で、コメントは配列として保存されます。
