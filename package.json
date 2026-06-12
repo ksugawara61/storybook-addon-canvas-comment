@@ -1,0 +1,28 @@
+{
+  "devDependencies": {
+    "@storybook/icons": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "react": "catalog:",
+    "storybook": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./manager": "./src/manager.tsx",
+    "./preview": "./src/preview.ts"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "main": "./src/index.ts",
+  "name": "storybook-addon-canvas-comments",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "type": "module",
+  "version": "0.1.0"
+}
