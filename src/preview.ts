@@ -15,6 +15,7 @@ import { summarizeStory } from "./dom-summary";
 import type { CanvasComment } from "./types";
 
 const OVERLAY_ROOT_ID = "storybook-addon-canvas-comments-overlay";
+const INPUT_ROOT_ID = "storybook-addon-canvas-comments-input";
 const OVERLAY_ATTRIBUTE = "data-canvas-comments-overlay";
 
 export const globalTypes = {
@@ -142,6 +143,162 @@ const scalePoint = (comment: CanvasComment) => {
   };
 };
 
+const removeCommentInputRoot = () => {
+  document.getElementById(INPUT_ROOT_ID)?.remove();
+};
+
+const onCommentInput = (
+  textarea: HTMLTextAreaElement,
+  saveButton: HTMLButtonElement,
+) => {
+  const hasText = textarea.value.trim().length > 0;
+  saveButton.disabled = !hasText;
+  saveButton.style.opacity = hasText ? "1" : "0.4";
+  saveButton.style.cursor = hasText ? "pointer" : "default";
+};
+
+const onCommentKeydown = (
+  e: KeyboardEvent,
+  getValue: () => string,
+  finish: (value: string | null) => void,
+) => {
+  if (e.key === "Escape") {
+    e.preventDefault();
+    finish(null);
+    return;
+  }
+
+  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+    e.preventDefault();
+    const trimmed = getValue().trim();
+    if (trimmed) finish(trimmed);
+  }
+};
+
+const promptCommentNote = (point: {
+  x: number;
+  y: number;
+}): Promise<string | null> => {
+  removeCommentInputRoot();
+
+  return new Promise((resolve) => {
+    const POPOVER_WIDTH = 280;
+    const POPOVER_HEIGHT = 140;
+    const OFFSET = 12;
+
+    const left =
+      point.x + OFFSET + POPOVER_WIDTH > window.innerWidth
+        ? point.x - OFFSET - POPOVER_WIDTH
+        : point.x + OFFSET;
+    const top =
+      point.y + OFFSET + POPOVER_HEIGHT > window.innerHeight
+        ? point.y - OFFSET - POPOVER_HEIGHT
+        : point.y + OFFSET;
+
+    const root = document.createElement("div");
+    root.id = INPUT_ROOT_ID;
+    root.setAttribute(OVERLAY_ATTRIBUTE, "true");
+    Object.assign(root.style, {
+      background: "#111827",
+      border: "1px solid rgba(255, 255, 255, 0.18)",
+      borderRadius: "8px",
+      boxShadow: "0 12px 32px rgba(0, 0, 0, 0.4)",
+      display: "flex",
+      flexDirection: "column",
+      font: "12px/1.5 system-ui, sans-serif",
+      gap: "8px",
+      left: `${Math.max(8, left)}px`,
+      padding: "10px",
+      pointerEvents: "auto",
+      position: "fixed",
+      top: `${Math.max(8, top)}px`,
+      width: `${POPOVER_WIDTH}px`,
+      zIndex: "2147483647",
+    });
+
+    const textarea = document.createElement("textarea");
+    textarea.setAttribute(OVERLAY_ATTRIBUTE, "true");
+    textarea.placeholder = "UI フィードバックを入力…";
+    textarea.rows = 4;
+    Object.assign(textarea.style, {
+      background: "rgba(255, 255, 255, 0.08)",
+      border: "1px solid rgba(255, 255, 255, 0.2)",
+      borderRadius: "4px",
+      color: "#ffffff",
+      font: "inherit",
+      outline: "none",
+      padding: "6px 8px",
+      resize: "vertical",
+      width: "100%",
+    });
+
+    const actions = document.createElement("div");
+    actions.setAttribute(OVERLAY_ATTRIBUTE, "true");
+    Object.assign(actions.style, {
+      display: "flex",
+      gap: "6px",
+      justifyContent: "flex-end",
+    });
+
+    const cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.textContent = "キャンセル";
+    cancelButton.setAttribute(OVERLAY_ATTRIBUTE, "true");
+    Object.assign(cancelButton.style, {
+      background: "transparent",
+      border: "1px solid rgba(255, 255, 255, 0.3)",
+      borderRadius: "4px",
+      color: "#ffffff",
+      cursor: "pointer",
+      font: "inherit",
+      padding: "4px 10px",
+    });
+
+    const saveButton = document.createElement("button");
+    saveButton.type = "button";
+    saveButton.textContent = "保存";
+    saveButton.disabled = true;
+    saveButton.setAttribute(OVERLAY_ATTRIBUTE, "true");
+    Object.assign(saveButton.style, {
+      background: "#f59e0b",
+      border: "none",
+      borderRadius: "4px",
+      color: "#111827",
+      cursor: "pointer",
+      font: "inherit",
+      fontWeight: "600",
+      opacity: "0.4",
+      padding: "4px 10px",
+    });
+
+    const finish = (value: string | null) => {
+      removeCommentInputRoot();
+      resolve(value);
+    };
+
+    textarea.addEventListener("input", () =>
+      onCommentInput(textarea, saveButton),
+    );
+    textarea.addEventListener("keydown", (e) =>
+      onCommentKeydown(e, () => textarea.value, finish),
+    );
+    saveButton.addEventListener("click", () => {
+      const trimmed = textarea.value.trim();
+      if (trimmed) finish(trimmed);
+    });
+
+    cancelButton.addEventListener("click", () => {
+      finish(null);
+    });
+
+    actions.append(cancelButton, saveButton);
+    root.append(textarea, actions);
+    document.body.append(root);
+
+    textarea.focus();
+  });
+};
+
 const createCommentPin = (comment: CanvasComment) => {
   const wrapper = document.createElement("div");
   const point = scalePoint(comment);
@@ -262,7 +419,7 @@ const createComment = async (
   event: Pick<MouseEvent, "clientX" | "clientY">,
   context: StoryContext<Renderer>,
 ) => {
-  const note = window.prompt("UI Feedback");
+  const note = await promptCommentNote({ x: event.clientX, y: event.clientY });
   const normalizedNote = note?.trim();
 
   if (!normalizedNote) {
