@@ -23,17 +23,25 @@ Options:
   --help                      Show this help.
 `;
 
-async function main() {
-  const options = parseArgs(process.argv.slice(2));
+const parsePositiveInteger = (value: string, option: string) => {
+  const parsed = Number(value);
 
-  if (options === "help") {
-    console.log(HELP);
-    return;
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`${option} must be a positive integer.`);
   }
 
-  const result = await createCanvasCommentDomMap(options);
-  console.log(JSON.stringify(result, null, 2));
-}
+  return parsed;
+};
+
+const parseStatus = (value: string): CanvasCommentDomMapStatus => {
+  if (value === "open" || value === "resolved" || value === "all") {
+    return value;
+  }
+
+  throw new Error(
+    `Invalid --status "${value}". Expected open, resolved, or all.`,
+  );
+};
 
 const HELP_OPTIONS = new Set(["--help", "-h"]);
 
@@ -79,7 +87,25 @@ const VALUE_OPTION_READERS = {
   (options: CanvasCommentDomMapOptions, value: string) => void
 >;
 
-function parseArgs(args: string[]): CanvasCommentDomMapOptions | "help" {
+const isFlagOption = (
+  value: string,
+): value is keyof typeof FLAG_OPTION_READERS => value in FLAG_OPTION_READERS;
+
+const isValueOption = (
+  value: string,
+): value is keyof typeof VALUE_OPTION_READERS => value in VALUE_OPTION_READERS;
+
+const readRequiredValue = (args: string[], index: number, option: string) => {
+  const value = args[index + 1];
+
+  if (!value || value.startsWith("--")) {
+    throw new Error(`${option} requires a value.`);
+  }
+
+  return value;
+};
+
+const parseArgs = (args: string[]): CanvasCommentDomMapOptions | "help" => {
   const options: CanvasCommentDomMapOptions = {
     storybookUrl: "",
   };
@@ -114,51 +140,25 @@ function parseArgs(args: string[]): CanvasCommentDomMapOptions | "help" {
   }
 
   return options;
-}
+};
 
-function isFlagOption(
-  value: string,
-): value is keyof typeof FLAG_OPTION_READERS {
-  return value in FLAG_OPTION_READERS;
-}
+const main = async () => {
+  const options = parseArgs(process.argv.slice(2));
 
-function isValueOption(
-  value: string,
-): value is keyof typeof VALUE_OPTION_READERS {
-  return value in VALUE_OPTION_READERS;
-}
-
-function readRequiredValue(args: string[], index: number, option: string) {
-  const value = args[index + 1];
-
-  if (!value || value.startsWith("--")) {
-    throw new Error(`${option} requires a value.`);
+  if (options === "help") {
+    console.log(HELP);
+    return;
   }
 
-  return value;
-}
+  const result = await createCanvasCommentDomMap(options);
+  console.log(JSON.stringify(result, null, 2));
+};
 
-function parseStatus(value: string): CanvasCommentDomMapStatus {
-  if (value === "open" || value === "resolved" || value === "all") {
-    return value;
+void (async () => {
+  try {
+    await main();
+  } catch (error: unknown) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
   }
-
-  throw new Error(
-    `Invalid --status "${value}". Expected open, resolved, or all.`,
-  );
-}
-
-function parsePositiveInteger(value: string, option: string) {
-  const parsed = Number(value);
-
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error(`${option} must be a positive integer.`);
-  }
-
-  return parsed;
-}
-
-main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+})();

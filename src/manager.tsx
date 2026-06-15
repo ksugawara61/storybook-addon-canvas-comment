@@ -21,7 +21,136 @@ import {
 } from "./constants";
 import type { CanvasComment, CanvasCommentStatus } from "./types";
 
-function Tool() {
+const styles = {
+  actions: {
+    display: "flex",
+    gap: 8,
+    justifyContent: "flex-end",
+    marginTop: 10,
+  },
+  button: {
+    background: "transparent",
+    border: "1px solid rgba(128, 128, 128, 0.35)",
+    borderRadius: 4,
+    color: "inherit",
+    cursor: "pointer",
+    font: "12px system-ui",
+    padding: "4px 8px",
+  },
+  buttonIcon: {
+    height: 12,
+    width: 12,
+  },
+  dangerButton: {
+    alignItems: "center",
+    background: "transparent",
+    border: "1px solid rgba(220, 38, 38, 0.5)",
+    borderRadius: 4,
+    color: "#dc2626",
+    cursor: "pointer",
+    display: "flex",
+    font: "12px system-ui",
+    gap: 4,
+    padding: "4px 8px",
+  },
+  empty: {
+    color: "inherit",
+    opacity: 0.68,
+    padding: "20px 0",
+  },
+  error: {
+    background: "#fff1f0",
+    border: "1px solid #ffa39e",
+    borderRadius: 4,
+    color: "#a8071a",
+    marginBottom: 12,
+    padding: 8,
+  },
+  header: {
+    alignItems: "center",
+    display: "flex",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  headerActions: {
+    alignItems: "center",
+    display: "flex",
+    gap: 8,
+  },
+  item: {
+    borderBottom: "1px solid rgba(128, 128, 128, 0.24)",
+    padding: "12px 0",
+  },
+  itemHeader: {
+    alignItems: "center",
+    display: "flex",
+    gap: 8,
+    justifyContent: "space-between",
+  },
+  metaLabel: {
+    color: "inherit",
+    fontSize: 11,
+    marginTop: 6,
+    opacity: 0.68,
+    textTransform: "uppercase",
+  },
+  metaList: {
+    margin: 0,
+  },
+  metaValue: {
+    margin: "2px 0 0",
+    overflowWrap: "anywhere",
+  },
+  note: {
+    lineHeight: 1.5,
+    margin: "8px 0",
+    whiteSpace: "pre-wrap",
+  },
+  root: {
+    color: "inherit",
+    font: "13px system-ui",
+    padding: 12,
+  },
+  status: {
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: 700,
+    padding: "2px 8px",
+    textTransform: "uppercase",
+  },
+  storyTitle: {
+    color: "inherit",
+    fontSize: 12,
+    marginTop: 2,
+    opacity: 0.68,
+  },
+  toggleLabel: {
+    alignItems: "center",
+    color: "inherit",
+    cursor: "pointer",
+    display: "flex",
+    font: "12px system-ui",
+    gap: 4,
+  },
+} as const;
+
+const formatDate = (value: string) => {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString();
+};
+
+const statusStyle = (status: CanvasCommentStatus) => ({
+  ...styles.status,
+  background: status === "open" ? "#fff3cd" : "#e5f7ed",
+  color: status === "open" ? "#6f4e00" : "#166534",
+});
+
+const Tool = () => {
   const [globals, updateGlobals] = useGlobals();
   const active = globals[PARAM_KEY] === true;
 
@@ -35,9 +164,9 @@ function Tool() {
       <CommentAddIcon />
     </ToggleButton>
   );
-}
+};
 
-function OverlayTool() {
+const OverlayTool = () => {
   const [globals, updateGlobals] = useGlobals();
   const active = globals[COMMENTS_VISIBLE_PARAM_KEY] !== false;
 
@@ -51,9 +180,9 @@ function OverlayTool() {
       {active ? <EyeIcon /> : <EyeCloseIcon />}
     </ToggleButton>
   );
-}
+};
 
-function Panel() {
+const Panel = () => {
   const [globals, updateGlobals] = useGlobals();
   const [items, setItems] = useState<CanvasComment[]>([]);
   const [error, setError] = useState<string | undefined>();
@@ -261,7 +390,7 @@ function Panel() {
       )}
     </div>
   );
-}
+};
 
 addons.register(ADDON_ID, () => {
   addons.add(TOOL_ID, {
@@ -288,134 +417,3 @@ addons.register(ADDON_ID, () => {
     type: types.PANEL,
   });
 });
-
-function formatDate(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString();
-}
-
-function statusStyle(status: CanvasCommentStatus) {
-  return {
-    ...styles.status,
-    background: status === "open" ? "#fff3cd" : "#e5f7ed",
-    color: status === "open" ? "#6f4e00" : "#166534",
-  };
-}
-
-const styles = {
-  actions: {
-    display: "flex",
-    gap: 8,
-    justifyContent: "flex-end",
-    marginTop: 10,
-  },
-  button: {
-    background: "transparent",
-    border: "1px solid rgba(128, 128, 128, 0.35)",
-    borderRadius: 4,
-    color: "inherit",
-    cursor: "pointer",
-    font: "12px system-ui",
-    padding: "4px 8px",
-  },
-  buttonIcon: {
-    height: 12,
-    width: 12,
-  },
-  dangerButton: {
-    alignItems: "center",
-    background: "transparent",
-    border: "1px solid rgba(220, 38, 38, 0.5)",
-    borderRadius: 4,
-    color: "#dc2626",
-    cursor: "pointer",
-    display: "flex",
-    font: "12px system-ui",
-    gap: 4,
-    padding: "4px 8px",
-  },
-  empty: {
-    color: "inherit",
-    opacity: 0.68,
-    padding: "20px 0",
-  },
-  error: {
-    background: "#fff1f0",
-    border: "1px solid #ffa39e",
-    borderRadius: 4,
-    color: "#a8071a",
-    marginBottom: 12,
-    padding: 8,
-  },
-  header: {
-    alignItems: "center",
-    display: "flex",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  headerActions: {
-    alignItems: "center",
-    display: "flex",
-    gap: 8,
-  },
-  item: {
-    borderBottom: "1px solid rgba(128, 128, 128, 0.24)",
-    padding: "12px 0",
-  },
-  itemHeader: {
-    alignItems: "center",
-    display: "flex",
-    gap: 8,
-    justifyContent: "space-between",
-  },
-  metaLabel: {
-    color: "inherit",
-    fontSize: 11,
-    marginTop: 6,
-    opacity: 0.68,
-    textTransform: "uppercase",
-  },
-  metaList: {
-    margin: 0,
-  },
-  metaValue: {
-    margin: "2px 0 0",
-    overflowWrap: "anywhere",
-  },
-  note: {
-    lineHeight: 1.5,
-    margin: "8px 0",
-    whiteSpace: "pre-wrap",
-  },
-  root: {
-    color: "inherit",
-    font: "13px system-ui",
-    padding: 12,
-  },
-  status: {
-    borderRadius: 999,
-    fontSize: 11,
-    fontWeight: 700,
-    padding: "2px 8px",
-    textTransform: "uppercase",
-  },
-  storyTitle: {
-    color: "inherit",
-    fontSize: 12,
-    marginTop: 2,
-    opacity: 0.68,
-  },
-  toggleLabel: {
-    alignItems: "center",
-    color: "inherit",
-    cursor: "pointer",
-    display: "flex",
-    font: "12px system-ui",
-    gap: 4,
-  },
-} as const;

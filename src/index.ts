@@ -20,62 +20,64 @@ export const previewAnnotations = (entries: string[] = []) => [
   previewEntry,
 ];
 
-export async function viteFinal(config: UserConfig): Promise<UserConfig> {
-  return mergeConfig(config, {
-    plugins: [canvasCommentsApi()],
-  });
-}
+const json = (res: ServerResponse, statusCode: number, value: unknown) => {
+  res.statusCode = statusCode;
+  res.setHeader("content-type", "application/json");
+  res.end(JSON.stringify(value));
+};
 
-function canvasCommentsApi(): Plugin {
-  return {
-    configureServer(server) {
-      server.middlewares.use((req, res, next) => {
-        const pathname = new URL(req.url ?? "", "http://localhost").pathname;
+const getCommentsFile = () => resolve(process.cwd(), STORAGE_RELATIVE_PATH);
 
-        if (!pathname.startsWith(API_PATH)) {
-          next();
-          return;
-        }
+const readComments = async (): Promise<CanvasComment[]> => {
+  try {
+    const parsed = JSON.parse(await fs.readFile(getCommentsFile(), "utf8")) as
+      | unknown
+      | undefined;
+    return Array.isArray(parsed) ? parsed.filter(isCanvasComment) : [];
+  } catch {
+    return [];
+  }
+};
 
-        handleRequest(req, res, pathname).catch((error: unknown) => {
-          const message =
-            error instanceof Error ? error.message : "Unknown server error";
-          json(res, 500, { error: message });
-        });
-      });
-    },
-    name: "storybook-addon-canvas-comments-api",
-  };
-}
+const writeComments = async (comments: CanvasComment[]) => {
+  const file = getCommentsFile();
+  await fs.mkdir(dirname(file), { recursive: true });
+  await fs.writeFile(file, `${JSON.stringify(comments, null, 2)}\n`);
+};
 
-async function handleRequest(
-  req: IncomingMessage,
-  res: ServerResponse,
-  pathname: string,
-) {
-  if (pathname === API_PATH) {
-    await handleCollectionRequest(req, res);
+const readBody = async (req: IncomingMessage): Promise<unknown> => {
+  const chunks: Buffer[] = [];
+
+  for await (const chunk of req) {
+    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+  }
+
+  const raw = Buffer.concat(chunks).toString("utf8");
+  return raw ? (JSON.parse(raw) as unknown) : undefined;
+};
+
+const handleDeleteRequest = async (res: ServerResponse, id: string) => {
+  if (!id) {
+    json(res, 400, { error: "Invalid canvas comment id" });
     return;
   }
 
-  const prefix = `${API_PATH}/`;
+  const comments = await readComments();
+  const deleted = comments.find((comment) => comment.id === id);
 
-  if (pathname.startsWith(prefix)) {
-    await handleItemRequest(
-      req,
-      res,
-      decodeURIComponent(pathname.slice(prefix.length)),
-    );
+  if (!deleted) {
+    json(res, 404, { error: "Canvas comment not found" });
     return;
   }
 
-  json(res, 404, { error: "Canvas comments endpoint not found" });
-}
+  await writeComments(comments.filter((comment) => comment.id !== id));
+  json(res, 200, deleted);
+};
 
-async function handleCollectionRequest(
+const handleCollectionRequest = async (
   req: IncomingMessage,
   res: ServerResponse,
-) {
+) => {
   if (req.method === "GET") {
     json(res, 200, await readComments());
     return;
@@ -96,13 +98,13 @@ async function handleCollectionRequest(
   const comments = [body, ...(await readComments())];
   await writeComments(comments);
   json(res, 201, body);
-}
+};
 
-async function handleItemRequest(
+const handleItemRequest = async (
   req: IncomingMessage,
   res: ServerResponse,
   id: string,
-) {
+) => {
   if (req.method === "DELETE") {
     await handleDeleteRequest(res, id);
     return;
@@ -134,60 +136,57 @@ async function handleItemRequest(
 
   await writeComments(updatedComments);
   json(res, 200, updated);
-}
+};
 
-async function handleDeleteRequest(res: ServerResponse, id: string) {
-  if (!id) {
-    json(res, 400, { error: "Invalid canvas comment id" });
+const handleRequest = async (
+  req: IncomingMessage,
+  res: ServerResponse,
+  pathname: string,
+) => {
+  if (pathname === API_PATH) {
+    await handleCollectionRequest(req, res);
     return;
   }
 
-  const comments = await readComments();
-  const deleted = comments.find((comment) => comment.id === id);
+  const prefix = `${API_PATH}/`;
 
-  if (!deleted) {
-    json(res, 404, { error: "Canvas comment not found" });
+  if (pathname.startsWith(prefix)) {
+    await handleItemRequest(
+      req,
+      res,
+      decodeURIComponent(pathname.slice(prefix.length)),
+    );
     return;
   }
 
-  await writeComments(comments.filter((comment) => comment.id !== id));
-  json(res, 200, deleted);
-}
+  json(res, 404, { error: "Canvas comments endpoint not found" });
+};
 
-async function readComments(): Promise<CanvasComment[]> {
-  try {
-    const parsed = JSON.parse(await fs.readFile(getCommentsFile(), "utf8")) as
-      | unknown
-      | undefined;
-    return Array.isArray(parsed) ? parsed.filter(isCanvasComment) : [];
-  } catch {
-    return [];
-  }
-}
+const canvasCommentsApi = (): Plugin => ({
+  configureServer(server) {
+    server.middlewares.use((req, res, next) => {
+      const pathname = new URL(req.url ?? "", "http://localhost").pathname;
 
-async function writeComments(comments: CanvasComment[]) {
-  const file = getCommentsFile();
-  await fs.mkdir(dirname(file), { recursive: true });
-  await fs.writeFile(file, `${JSON.stringify(comments, null, 2)}\n`);
-}
+      if (!pathname.startsWith(API_PATH)) {
+        next();
+        return;
+      }
 
-function getCommentsFile() {
-  return resolve(process.cwd(), STORAGE_RELATIVE_PATH);
-}
+      void (async () => {
+        try {
+          await handleRequest(req, res, pathname);
+        } catch (error: unknown) {
+          const message =
+            error instanceof Error ? error.message : "Unknown server error";
+          json(res, 500, { error: message });
+        }
+      })();
+    });
+  },
+  name: "storybook-addon-canvas-comments-api",
+});
 
-async function readBody(req: IncomingMessage): Promise<unknown> {
-  const chunks: Buffer[] = [];
-
-  for await (const chunk of req) {
-    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
-  }
-
-  const raw = Buffer.concat(chunks).toString("utf8");
-  return raw ? (JSON.parse(raw) as unknown) : undefined;
-}
-
-function json(res: ServerResponse, statusCode: number, value: unknown) {
-  res.statusCode = statusCode;
-  res.setHeader("content-type", "application/json");
-  res.end(JSON.stringify(value));
-}
+export const viteFinal = async (config: UserConfig): Promise<UserConfig> =>
+  mergeConfig(config, {
+    plugins: [canvasCommentsApi()],
+  });

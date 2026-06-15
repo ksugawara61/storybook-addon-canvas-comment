@@ -12,185 +12,169 @@ import type {
 export type CanvasCommentDomMapStatus = CanvasCommentStatus | "all";
 
 export type CanvasCommentDomMapOptions = {
-  storybookUrl: string;
-  storyId?: string;
-  status?: CanvasCommentDomMapStatus;
-  viewport?: CanvasCommentViewport;
   includeDomTree?: boolean;
-  skipLoadingWait?: boolean;
-  timeoutMs?: number;
-  maxDomDepth?: number;
   maxDomChildren?: number;
+  maxDomDepth?: number;
   maxTextLength?: number;
+  skipLoadingWait?: boolean;
+  status?: CanvasCommentDomMapStatus;
+  storyId?: string;
+  storybookUrl: string;
+  timeoutMs?: number;
+  viewport?: CanvasCommentViewport;
 };
 
 export type DomElementSummary = {
-  tagName: string;
-  selector: string;
-  role?: string;
-  ariaLabel?: string;
-  text?: string;
-  attributes: Record<string, string>;
-  rect: CanvasCommentRect;
-  domPath: string;
   ancestors: Array<{
-    tagName: string;
-    selector: string;
     attributes: Record<string, string>;
+    selector: string;
+    tagName: string;
   }>;
+  ariaLabel?: string;
+  attributes: Record<string, string>;
+  domPath: string;
+  rect: CanvasCommentRect;
+  role?: string;
+  selector: string;
+  tagName: string;
+  text?: string;
 };
 
 export type DomTreeNode = {
-  tagName: string;
-  selector: string;
-  text?: string;
   attributes: Record<string, string>;
-  rect: CanvasCommentRect;
-  commentIds: string[];
   children?: DomTreeNode[];
+  commentIds: string[];
+  rect: CanvasCommentRect;
+  selector: string;
+  tagName: string;
+  text?: string;
   truncatedChildren?: number;
 };
 
 export type CanvasCommentDomMapItem = {
   comment: {
-    id: string;
-    note: string;
-    status: CanvasCommentStatus;
-    selector: string;
-    dataTestId?: string;
+    createdAt: string;
+    currentPointer: CanvasCommentPoint;
     dataAiComponent?: string;
     dataAiSource?: string;
-    storedRect: CanvasCommentRect;
+    dataTestId?: string;
+    id: string;
+    note: string;
+    selector: string;
+    status: CanvasCommentStatus;
     storedPointer: CanvasCommentPoint;
-    currentPointer: CanvasCommentPoint;
-    createdAt: string;
+    storedRect: CanvasCommentRect;
   };
-  target: DomElementSummary | null;
-  matchType: "selector" | "pointer" | "none";
   error?: string;
+  matchType: "none" | "pointer" | "selector";
+  target: DomElementSummary | null;
 };
 
 export type StoryCanvasCommentDomMap = {
-  storyId: string;
-  storyTitle: string;
-  storyName: string;
-  url: string;
-  viewport: CanvasCommentViewport;
   comments: CanvasCommentDomMapItem[];
   domTree?: DomTreeNode;
+  storyId: string;
+  storyName: string;
+  storyTitle: string;
+  url: string;
+  viewport: CanvasCommentViewport;
 };
 
 export type CanvasCommentDomMap = {
-  storybookUrl: string;
   commentsApiUrl: string;
   generatedAt: string;
   stories: StoryCanvasCommentDomMap[];
+  storybookUrl: string;
 };
 
 type NormalizedOptions = {
-  storybookUrl: string;
-  storyId?: string;
-  status: CanvasCommentDomMapStatus;
-  viewport: CanvasCommentViewport;
   includeDomTree: boolean;
-  skipLoadingWait: boolean;
-  timeoutMs: number;
-  maxDomDepth: number;
   maxDomChildren: number;
+  maxDomDepth: number;
   maxTextLength: number;
+  skipLoadingWait: boolean;
+  status: CanvasCommentDomMapStatus;
+  storyId?: string;
+  storybookUrl: string;
+  timeoutMs: number;
+  viewport: CanvasCommentViewport;
 };
 
 type BrowserDomMapResult = {
-  viewport: CanvasCommentViewport;
   comments: Array<{
-    id: string;
     currentPointer: CanvasCommentPoint;
-    target: DomElementSummary | null;
-    matchType: CanvasCommentDomMapItem["matchType"];
     error?: string;
+    id: string;
+    matchType: CanvasCommentDomMapItem["matchType"];
+    target: DomElementSummary | null;
   }>;
   domTree?: DomTreeNode;
+  viewport: CanvasCommentViewport;
 };
 
-export async function createCanvasCommentDomMap(
+const LOADING_SELECTORS = [
+  '[role="progressbar"]',
+  '[class*="loading" i]',
+  '[class*="spinner" i]',
+  '[data-testid*="loading" i]',
+  '[data-testid*="skeleton" i]',
+];
+
+const LOADING_TEXT_PATTERN = /読み込み中|Loading/i;
+const LOADING_POLL_INTERVAL_MS = 100;
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), Math.max(min, max));
+
+const normalizeStorybookUrl = (value: string) => {
+  const url = new URL(value);
+  url.hash = "";
+  url.search = "";
+  return url.toString().replace(/\/$/, "");
+};
+
+const buildCanvasCommentsApiUrl = (storybookUrl: string) =>
+  `${storybookUrl}${API_PATH}`;
+
+const buildStoryUrl = (storybookUrl: string, storyId: string) => {
+  const url = new URL(`${storybookUrl}/iframe.html`);
+  url.searchParams.set("id", storyId);
+  url.searchParams.set("viewMode", "story");
+  return url.toString();
+};
+
+const normalizeOptions = (
   options: CanvasCommentDomMapOptions,
-): Promise<CanvasCommentDomMap> {
-  const normalized = normalizeOptions(options);
-  const comments = filterCanvasComments(await loadCanvasComments(normalized), {
-    status: normalized.status,
-    storyId: normalized.storyId,
-  });
-  const groups = groupCommentsByStory(comments);
+): NormalizedOptions => ({
+  includeDomTree: options.includeDomTree ?? false,
+  maxDomChildren: options.maxDomChildren ?? 20,
+  maxDomDepth: options.maxDomDepth ?? 6,
+  maxTextLength: options.maxTextLength ?? 240,
+  skipLoadingWait: options.skipLoadingWait ?? false,
+  status: options.status ?? "open",
+  storybookUrl: normalizeStorybookUrl(options.storybookUrl),
+  storyId: options.storyId,
+  timeoutMs: options.timeoutMs ?? 15000,
+  viewport: options.viewport ?? { height: 844, width: 390 },
+});
 
-  if (groups.length === 0) {
-    return {
-      commentsApiUrl: buildCanvasCommentsApiUrl(normalized.storybookUrl),
-      generatedAt: new Date().toISOString(),
-      stories: [],
-      storybookUrl: normalized.storybookUrl,
-    };
-  }
+export const scalePoint = (
+  point: CanvasCommentPoint,
+  sourceViewport: CanvasCommentViewport,
+  targetViewport: CanvasCommentViewport,
+): CanvasCommentPoint => {
+  const sourceWidth = Math.max(sourceViewport.width, 1);
+  const sourceHeight = Math.max(sourceViewport.height, 1);
+  const x = (point.x / sourceWidth) * targetViewport.width;
+  const y = (point.y / sourceHeight) * targetViewport.height;
 
-  const browser = await chromium.launch({ headless: true });
+  return {
+    x: clamp(x, 8, targetViewport.width - 8),
+    y: clamp(y, 8, targetViewport.height - 8),
+  };
+};
 
-  try {
-    const stories: StoryCanvasCommentDomMap[] = [];
-
-    for (const group of groups) {
-      stories.push(await mapStoryComments(browser, normalized, group));
-    }
-
-    return {
-      commentsApiUrl: buildCanvasCommentsApiUrl(normalized.storybookUrl),
-      generatedAt: new Date().toISOString(),
-      stories,
-      storybookUrl: normalized.storybookUrl,
-    };
-  } finally {
-    await browser.close();
-  }
-}
-
-export async function loadCanvasComments(
-  options: Pick<NormalizedOptions, "storybookUrl">,
-): Promise<CanvasComment[]> {
-  const url = buildCanvasCommentsApiUrl(options.storybookUrl);
-  const response = await fetch(url, {
-    headers: { accept: "application/json" },
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch canvas comments from ${url}: ${response.status} ${response.statusText}`,
-    );
-  }
-
-  const raw = (await response.json()) as unknown;
-
-  if (!Array.isArray(raw)) {
-    throw new Error(`Invalid canvas comments response from ${url}`);
-  }
-
-  return raw.filter(isCanvasComment);
-}
-
-export function filterCanvasComments(
-  comments: CanvasComment[],
-  filters: {
-    storyId?: string;
-    status: CanvasCommentDomMapStatus;
-  },
-) {
-  return comments.filter((comment) => {
-    if (filters.storyId && comment.storyId !== filters.storyId) {
-      return false;
-    }
-
-    return filters.status === "all" || comment.status === filters.status;
-  });
-}
-
-export function parseViewport(value: string): CanvasCommentViewport {
+export const parseViewport = (value: string): CanvasCommentViewport => {
   const match = /^(\d+)x(\d+)$/i.exec(value.trim());
 
   if (!match) {
@@ -211,80 +195,176 @@ export function parseViewport(value: string): CanvasCommentViewport {
   }
 
   return { height, width };
-}
+};
 
-export function scalePoint(
-  point: CanvasCommentPoint,
-  sourceViewport: CanvasCommentViewport,
-  targetViewport: CanvasCommentViewport,
-): CanvasCommentPoint {
-  const sourceWidth = Math.max(sourceViewport.width, 1);
-  const sourceHeight = Math.max(sourceViewport.height, 1);
-  const x = (point.x / sourceWidth) * targetViewport.width;
-  const y = (point.y / sourceHeight) * targetViewport.height;
+export const filterCanvasComments = (
+  comments: CanvasComment[],
+  filters: {
+    status: CanvasCommentDomMapStatus;
+    storyId?: string;
+  },
+) =>
+  comments.filter((comment) => {
+    if (filters.storyId && comment.storyId !== filters.storyId) {
+      return false;
+    }
 
-  return {
-    x: clamp(x, 8, targetViewport.width - 8),
-    y: clamp(y, 8, targetViewport.height - 8),
-  };
-}
+    return filters.status === "all" || comment.status === filters.status;
+  });
 
-function normalizeOptions(
-  options: CanvasCommentDomMapOptions,
-): NormalizedOptions {
-  return {
-    includeDomTree: options.includeDomTree ?? false,
-    maxDomChildren: options.maxDomChildren ?? 20,
-    maxDomDepth: options.maxDomDepth ?? 6,
-    maxTextLength: options.maxTextLength ?? 240,
-    skipLoadingWait: options.skipLoadingWait ?? false,
-    status: options.status ?? "open",
-    storybookUrl: normalizeStorybookUrl(options.storybookUrl),
-    storyId: options.storyId,
-    timeoutMs: options.timeoutMs ?? 15000,
-    viewport: options.viewport ?? { height: 844, width: 390 },
-  };
-}
-
-function normalizeStorybookUrl(value: string) {
-  const url = new URL(value);
-  url.hash = "";
-  url.search = "";
-  return url.toString().replace(/\/$/, "");
-}
-
-function buildCanvasCommentsApiUrl(storybookUrl: string) {
-  return `${storybookUrl}${API_PATH}`;
-}
-
-function buildStoryUrl(storybookUrl: string, storyId: string) {
-  const url = new URL(`${storybookUrl}/iframe.html`);
-  url.searchParams.set("id", storyId);
-  url.searchParams.set("viewMode", "story");
-  return url.toString();
-}
-
-function groupCommentsByStory(comments: CanvasComment[]) {
-  const stories = new Map<string, CanvasComment[]>();
-
-  for (const comment of comments) {
-    stories.set(comment.storyId, [
-      ...(stories.get(comment.storyId) ?? []),
-      comment,
-    ]);
-  }
+const groupCommentsByStory = (comments: CanvasComment[]) => {
+  const stories = comments.reduce<Map<string, CanvasComment[]>>(
+    (acc, comment) => {
+      acc.set(comment.storyId, [...(acc.get(comment.storyId) ?? []), comment]);
+      return acc;
+    },
+    new Map(),
+  );
 
   return Array.from(stories, ([storyId, storyComments]) => ({
     comments: storyComments,
     storyId,
   }));
-}
+};
 
-async function mapStoryComments(
+export const loadCanvasComments = async (
+  options: Pick<NormalizedOptions, "storybookUrl">,
+): Promise<CanvasComment[]> => {
+  const url = buildCanvasCommentsApiUrl(options.storybookUrl);
+  const response = await fetch(url, {
+    headers: { accept: "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch canvas comments from ${url}: ${response.status} ${response.statusText}`,
+    );
+  }
+
+  const raw = (await response.json()) as unknown;
+
+  if (!Array.isArray(raw)) {
+    throw new Error(`Invalid canvas comments response from ${url}`);
+  }
+
+  return raw.filter(isCanvasComment);
+};
+
+const installEvaluateNameHelper = async (page: Page) => {
+  await page.evaluate(`(() => {
+    if (typeof globalThis.__name !== "function") {
+      Object.defineProperty(globalThis, "__name", {
+        configurable: true,
+        value: (target) => target,
+      });
+    }
+  })()`);
+};
+
+const hasLoadingIndicator = async (page: Page) => {
+  const root = page.locator("#storybook-root");
+  const indicatorCount = await root
+    .locator(LOADING_SELECTORS.join(", "))
+    .count();
+
+  if (indicatorCount > 0) {
+    return true;
+  }
+
+  return (await root.getByText(LOADING_TEXT_PATTERN).count()) > 0;
+};
+
+const waitForLoadingComplete = async (
+  page: Page,
+  options: { enabled: boolean; timeoutMs: number },
+) => {
+  if (!options.enabled) {
+    return;
+  }
+
+  const deadline = Date.now() + options.timeoutMs;
+
+  while (Date.now() < deadline) {
+    if (!(await hasLoadingIndicator(page))) {
+      return;
+    }
+
+    await page.waitForTimeout(LOADING_POLL_INTERVAL_MS);
+  }
+
+  console.warn(
+    `Canvas comments DOM map: loading indicators were still present after ${options.timeoutMs}ms.`,
+  );
+};
+
+const waitForStoryReady = async (page: Page, timeoutMs: number) => {
+  await page.waitForSelector("#storybook-root", {
+    state: "attached",
+    timeout: timeoutMs,
+  });
+
+  try {
+    await page.waitForFunction(
+      () => {
+        type StorybookWindow = Window & {
+          __STORYBOOK_ADDONS_CHANNEL__?: {
+            last(eventName: string): unknown;
+          };
+        };
+        const channel = (window as StorybookWindow)
+          .__STORYBOOK_ADDONS_CHANNEL__;
+        return channel?.last("storyRendered") !== undefined;
+      },
+      { timeout: timeoutMs },
+    );
+  } catch {
+    // storyRendered may not fire in all environments; continue anyway
+  }
+};
+
+const mergeMappedComments = (
+  comments: CanvasComment[],
+  browserResult: BrowserDomMapResult,
+): CanvasCommentDomMapItem[] => {
+  const sourceComments = new Map(
+    comments.map((comment) => [comment.id, comment]),
+  );
+
+  return browserResult.comments.flatMap((mapped) => {
+    const comment = sourceComments.get(mapped.id);
+
+    if (!comment) {
+      return [];
+    }
+
+    return [
+      {
+        comment: {
+          createdAt: comment.createdAt,
+          currentPointer: mapped.currentPointer,
+          dataAiComponent: comment.dataAiComponent,
+          dataAiSource: comment.dataAiSource,
+          dataTestId: comment.dataTestId,
+          id: comment.id,
+          note: comment.note,
+          selector: comment.selector,
+          status: comment.status,
+          storedPointer: comment.pointer,
+          storedRect: comment.rect,
+        },
+        error: mapped.error,
+        matchType: mapped.matchType,
+        target: mapped.target,
+      },
+    ];
+  });
+};
+
+const mapStoryComments = async (
   browser: Browser,
   options: NormalizedOptions,
-  group: { storyId: string; comments: CanvasComment[] },
-): Promise<StoryCanvasCommentDomMap> {
+  group: { comments: CanvasComment[]; storyId: string },
+): Promise<StoryCanvasCommentDomMap> => {
   const [firstComment] = group.comments;
 
   if (!firstComment) {
@@ -667,131 +747,43 @@ async function mapStoryComments(
   } finally {
     await page.close();
   }
-}
+};
 
-async function installEvaluateNameHelper(page: Page) {
-  await page.evaluate(`(() => {
-    if (typeof globalThis.__name !== "function") {
-      Object.defineProperty(globalThis, "__name", {
-        configurable: true,
-        value: (target) => target,
-      });
-    }
-  })()`);
-}
-
-const LOADING_SELECTORS = [
-  '[role="progressbar"]',
-  '[class*="loading" i]',
-  '[class*="spinner" i]',
-  '[data-testid*="loading" i]',
-  '[data-testid*="skeleton" i]',
-];
-
-const LOADING_TEXT_PATTERN = /読み込み中|Loading/i;
-const LOADING_POLL_INTERVAL_MS = 100;
-
-async function waitForLoadingComplete(
-  page: Page,
-  options: { enabled: boolean; timeoutMs: number },
-) {
-  if (!options.enabled) {
-    return;
-  }
-
-  const deadline = Date.now() + options.timeoutMs;
-
-  while (Date.now() < deadline) {
-    if (!(await hasLoadingIndicator(page))) {
-      return;
-    }
-
-    await page.waitForTimeout(LOADING_POLL_INTERVAL_MS);
-  }
-
-  console.warn(
-    `Canvas comments DOM map: loading indicators were still present after ${options.timeoutMs}ms.`,
-  );
-}
-
-async function hasLoadingIndicator(page: Page) {
-  const root = page.locator("#storybook-root");
-  const indicatorCount = await root
-    .locator(LOADING_SELECTORS.join(", "))
-    .count();
-
-  if (indicatorCount > 0) {
-    return true;
-  }
-
-  return (await root.getByText(LOADING_TEXT_PATTERN).count()) > 0;
-}
-
-async function waitForStoryReady(
-  page: Awaited<ReturnType<Browser["newPage"]>>,
-  timeoutMs: number,
-) {
-  await page.waitForSelector("#storybook-root", {
-    state: "attached",
-    timeout: timeoutMs,
+export const createCanvasCommentDomMap = async (
+  options: CanvasCommentDomMapOptions,
+): Promise<CanvasCommentDomMap> => {
+  const normalized = normalizeOptions(options);
+  const comments = filterCanvasComments(await loadCanvasComments(normalized), {
+    status: normalized.status,
+    storyId: normalized.storyId,
   });
+  const groups = groupCommentsByStory(comments);
 
-  await page
-    .waitForFunction(
-      () => {
-        type StorybookWindow = Window & {
-          __STORYBOOK_ADDONS_CHANNEL__?: {
-            last(eventName: string): unknown;
-          };
-        };
-        const channel = (window as StorybookWindow)
-          .__STORYBOOK_ADDONS_CHANNEL__;
-        return channel?.last("storyRendered") !== undefined;
-      },
-      { timeout: timeoutMs },
-    )
-    .catch(() => undefined);
-}
-
-function mergeMappedComments(
-  comments: CanvasComment[],
-  browserResult: BrowserDomMapResult,
-): CanvasCommentDomMapItem[] {
-  const sourceComments = new Map(
-    comments.map((comment) => [comment.id, comment]),
-  );
-  const mappedComments: CanvasCommentDomMapItem[] = [];
-
-  for (const mapped of browserResult.comments) {
-    const comment = sourceComments.get(mapped.id);
-
-    if (!comment) {
-      continue;
-    }
-
-    mappedComments.push({
-      comment: {
-        createdAt: comment.createdAt,
-        currentPointer: mapped.currentPointer,
-        dataAiComponent: comment.dataAiComponent,
-        dataAiSource: comment.dataAiSource,
-        dataTestId: comment.dataTestId,
-        id: comment.id,
-        note: comment.note,
-        selector: comment.selector,
-        status: comment.status,
-        storedPointer: comment.pointer,
-        storedRect: comment.rect,
-      },
-      error: mapped.error,
-      matchType: mapped.matchType,
-      target: mapped.target,
-    });
+  if (groups.length === 0) {
+    return {
+      commentsApiUrl: buildCanvasCommentsApiUrl(normalized.storybookUrl),
+      generatedAt: new Date().toISOString(),
+      stories: [],
+      storybookUrl: normalized.storybookUrl,
+    };
   }
 
-  return mappedComments;
-}
+  const browser = await chromium.launch({ headless: true });
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), Math.max(min, max));
-}
+  try {
+    const stories: StoryCanvasCommentDomMap[] = [];
+
+    for (const group of groups) {
+      stories.push(await mapStoryComments(browser, normalized, group));
+    }
+
+    return {
+      commentsApiUrl: buildCanvasCommentsApiUrl(normalized.storybookUrl),
+      generatedAt: new Date().toISOString(),
+      stories,
+      storybookUrl: normalized.storybookUrl,
+    };
+  } finally {
+    await browser.close();
+  }
+};

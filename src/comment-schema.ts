@@ -1,6 +1,30 @@
 import type { CanvasComment, CanvasCommentStatus } from "./types";
 
-export function isCanvasComment(value: unknown): value is CanvasComment {
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const isCanvasCommentStatus = (value: unknown): value is CanvasCommentStatus =>
+  value === "open" || value === "resolved";
+
+const isOptionalString = (value: unknown) =>
+  value === undefined || typeof value === "string";
+
+const isRect = (value: unknown): value is CanvasComment["rect"] =>
+  isRecord(value) &&
+  typeof value.x === "number" &&
+  typeof value.y === "number" &&
+  typeof value.width === "number" &&
+  typeof value.height === "number";
+
+const isPoint = (value: unknown): value is CanvasComment["pointer"] =>
+  isRecord(value) && typeof value.x === "number" && typeof value.y === "number";
+
+const isViewport = (value: unknown): value is CanvasComment["viewport"] =>
+  isRecord(value) &&
+  typeof value.width === "number" &&
+  typeof value.height === "number";
+
+export const isCanvasComment = (value: unknown): value is CanvasComment => {
   if (!isRecord(value)) {
     return false;
   }
@@ -21,52 +45,14 @@ export function isCanvasComment(value: unknown): value is CanvasComment {
     typeof value.createdAt === "string" &&
     isCanvasCommentStatus(value.status)
   );
-}
+};
 
-export function readCanvasCommentStatus(
+export const readCanvasCommentStatus = (
   value: unknown,
-): CanvasCommentStatus | undefined {
+): CanvasCommentStatus | undefined => {
   if (!isRecord(value)) {
     return undefined;
   }
 
   return isCanvasCommentStatus(value.status) ? value.status : undefined;
-}
-
-function isCanvasCommentStatus(value: unknown): value is CanvasCommentStatus {
-  return value === "open" || value === "resolved";
-}
-
-function isOptionalString(value: unknown) {
-  return value === undefined || typeof value === "string";
-}
-
-function isRect(value: unknown): value is CanvasComment["rect"] {
-  return (
-    isRecord(value) &&
-    typeof value.x === "number" &&
-    typeof value.y === "number" &&
-    typeof value.width === "number" &&
-    typeof value.height === "number"
-  );
-}
-
-function isPoint(value: unknown): value is CanvasComment["pointer"] {
-  return (
-    isRecord(value) &&
-    typeof value.x === "number" &&
-    typeof value.y === "number"
-  );
-}
-
-function isViewport(value: unknown): value is CanvasComment["viewport"] {
-  return (
-    isRecord(value) &&
-    typeof value.width === "number" &&
-    typeof value.height === "number"
-  );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
+};

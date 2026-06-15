@@ -34,208 +34,114 @@ export const initialGlobals = {
   [PARAM_KEY]: false,
 };
 
-export const decorators = [WithCanvasComments];
-
-function WithCanvasComments(
-  Story: PartialStoryFn<Renderer>,
-  context: StoryContext<Renderer>,
-) {
-  // biome-ignore lint/correctness/useHookAtTopLevel: Storybook preview decorators support preview-api hooks.
-  const [globals] = useGlobals();
-  const enabled = globals[PARAM_KEY] === true;
-  const commentsVisible = globals[COMMENTS_VISIBLE_PARAM_KEY] !== false;
-
-  // biome-ignore lint/correctness/useHookAtTopLevel: Storybook preview decorators support preview-api hooks.
-  useEffect(() => {
-    if (!enabled || !isStoryView(context)) return;
-
-    const onClick = (event: MouseEvent) => {
-      const target = resolveElement(event.target);
-      if (!target) return;
-      if (target.closest(`[${OVERLAY_ATTRIBUTE}]`)) return;
-
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-
-      const click = { clientX: event.clientX, clientY: event.clientY };
-      window.setTimeout(() => void createComment(target, click, context), 0);
-    };
-
-    document.addEventListener("click", onClick, true);
-    return () => document.removeEventListener("click", onClick, true);
-  }, [enabled, context.id, context.name, context.title, context.viewMode]);
-
-  // biome-ignore lint/correctness/useHookAtTopLevel: Storybook preview decorators support preview-api hooks.
-  useEffect(() => {
-    if (!commentsVisible || !isStoryView(context)) {
-      removeCommentOverlay();
-      return;
-    }
-
-    let disposed = false;
-    let items: CanvasComment[] = [];
-
-    const render = () => {
-      if (!disposed) {
-        renderCommentOverlay(items);
-      }
-    };
-
-    const load = async () => {
-      try {
-        items = await loadOpenComments(context.id);
-      } catch {
-        items = [];
-      }
-
-      render();
-    };
-
-    const channel = addons.getChannel();
-    const onCreated = (item: CanvasComment) => {
-      if (item.storyId !== context.id || item.status !== "open") return;
-
-      items = [item, ...items.filter((next) => next.id !== item.id)];
-      render();
-    };
-    const onUpdated = (item: CanvasComment) => {
-      items = items.filter((next) => next.id !== item.id);
-
-      if (item.storyId === context.id && item.status === "open") {
-        items = [item, ...items];
-      }
-
-      render();
-    };
-    const onDeleted = (item: CanvasComment) => {
-      items = items.filter((next) => next.id !== item.id);
-      render();
-    };
-
-    void load();
-    channel.on(EVENTS.CREATED, onCreated);
-    channel.on(EVENTS.DELETED, onDeleted);
-    channel.on(EVENTS.UPDATED, onUpdated);
-    window.addEventListener("resize", render);
-
-    return () => {
-      disposed = true;
-      channel.off(EVENTS.CREATED, onCreated);
-      channel.off(EVENTS.DELETED, onDeleted);
-      channel.off(EVENTS.UPDATED, onUpdated);
-      window.removeEventListener("resize", render);
-      removeCommentOverlay();
-    };
-  }, [commentsVisible, context.id, context.viewMode]);
-
-  return Story();
-}
-
-function isStoryView(context: StoryContext<Renderer>) {
-  return context.viewMode === undefined || context.viewMode === "story";
-}
-
-async function createComment(
-  target: HTMLElement,
-  event: Pick<MouseEvent, "clientX" | "clientY">,
-  context: StoryContext<Renderer>,
-) {
-  const note = window.prompt("UI Feedback");
-  const normalizedNote = note?.trim();
-
-  if (!normalizedNote) {
-    return;
+const escapeCss = (value: string) => {
+  if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
+    return CSS.escape(value);
   }
 
-  const anchor = findCommentTarget(target);
-  const rect = anchor.getBoundingClientRect();
-  const comment: CanvasComment = {
-    createdAt: new Date().toISOString(),
-    dataAiComponent: optionalAttribute(anchor, "data-ai-component"),
-    dataAiSource: optionalAttribute(anchor, "data-ai-source"),
-    dataTestId: optionalAttribute(anchor, "data-testid"),
-    id: createId(),
-    note: normalizedNote,
-    pointer: { x: event.clientX, y: event.clientY },
-    rect: {
-      height: rect.height,
-      width: rect.width,
-      x: rect.x,
-      y: rect.y,
-    },
-    selector: selectorFor(anchor),
-    status: "open",
-    storyId: context.id,
-    storyName: context.name,
-    storyTitle: context.title,
-    viewport: { height: window.innerHeight, width: window.innerWidth },
-  };
+  return value.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+};
 
-  try {
-    const response = await fetch(API_PATH, {
-      body: JSON.stringify(comment),
-      headers: { ...API_HEADERS, "content-type": "application/json" },
-      method: "POST",
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to save comment: ${response.status}`);
-    }
-
-    const saved = (await response.json()) as CanvasComment;
-    addons.getChannel().emit(EVENTS.CREATED, saved);
-  } catch (error) {
-    window.alert(
-      error instanceof Error ? error.message : "Failed to save canvas comment",
-    );
-  }
-}
-
-async function loadOpenComments(storyId: string) {
-  const response = await fetch(API_PATH, { headers: API_HEADERS });
-
-  if (!response.ok) {
-    throw new Error(`Failed to load comments: ${response.status}`);
+const createId = () => {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
   }
 
-  const comments = (await response.json()) as CanvasComment[];
-  return comments.filter(
-    (comment) => comment.storyId === storyId && comment.status === "open",
+  return `canvas-comment-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
+const optionalAttribute = (el: HTMLElement, name: string) =>
+  el.getAttribute(name) ?? undefined;
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), Math.max(min, max));
+
+const segmentFor = (el: HTMLElement) => {
+  const tag = el.tagName.toLowerCase();
+  const classPart = Array.from(el.classList)
+    .filter((className) => !className.includes(":"))
+    .slice(0, 2)
+    .map((className) => `.${escapeCss(className)}`)
+    .join("");
+  const parent = el.parentElement;
+
+  if (!parent) {
+    return `${tag}${classPart}`;
+  }
+
+  const sameTagSiblings = Array.from(parent.children).filter(
+    (child) => child.tagName === el.tagName,
   );
-}
 
-function renderCommentOverlay(items: CanvasComment[]) {
-  const root = ensureCommentOverlayRoot();
-  root.replaceChildren(...items.map(createCommentPin));
-}
-
-function ensureCommentOverlayRoot() {
-  const existing = document.getElementById(OVERLAY_ROOT_ID);
-
-  if (existing instanceof HTMLDivElement) {
-    return existing;
+  if (sameTagSiblings.length <= 1 && classPart) {
+    return `${tag}${classPart}`;
   }
 
-  const root = document.createElement("div");
-  root.id = OVERLAY_ROOT_ID;
-  root.setAttribute(OVERLAY_ATTRIBUTE, "true");
-  Object.assign(root.style, {
-    inset: "0",
-    pointerEvents: "none",
-    position: "fixed",
-    zIndex: "2147483647",
-  });
-  document.body.append(root);
+  const position = sameTagSiblings.indexOf(el) + 1;
+  return `${tag}${classPart}:nth-of-type(${position})`;
+};
 
-  return root;
-}
+const pathSelectorFor = (el: HTMLElement) => {
+  const segments: string[] = [];
+  let current: HTMLElement | null = el;
 
-function removeCommentOverlay() {
-  document.getElementById(OVERLAY_ROOT_ID)?.remove();
-}
+  while (
+    current &&
+    current !== document.body &&
+    current !== document.documentElement &&
+    segments.length < 5
+  ) {
+    segments.unshift(segmentFor(current));
+    current = current.parentElement;
+  }
 
-function createCommentPin(comment: CanvasComment) {
+  return segments.join(" > ") || el.tagName.toLowerCase();
+};
+
+const selectorFor = (el: HTMLElement) => {
+  const aiSource = el.getAttribute("data-ai-source");
+  if (aiSource) return `[data-ai-source="${escapeCss(aiSource)}"]`;
+
+  const testId = el.getAttribute("data-testid");
+  if (testId) return `[data-testid="${escapeCss(testId)}"]`;
+
+  const id = el.id;
+  if (id) return `#${escapeCss(id)}`;
+
+  return pathSelectorFor(el);
+};
+
+const findCommentTarget = (target: HTMLElement) =>
+  target.closest<HTMLElement>("[data-ai-source]") ??
+  target.closest<HTMLElement>("[data-testid]") ??
+  target.closest<HTMLElement>("[id]") ??
+  target;
+
+const resolveElement = (target: EventTarget | null): HTMLElement | null => {
+  if (target instanceof HTMLElement) {
+    return target;
+  }
+
+  if (target instanceof Node) {
+    return target.parentElement;
+  }
+
+  return null;
+};
+
+const scalePoint = (comment: CanvasComment) => {
+  const width = Math.max(comment.viewport.width, 1);
+  const height = Math.max(comment.viewport.height, 1);
+  const x = (comment.pointer.x / width) * window.innerWidth;
+  const y = (comment.pointer.y / height) * window.innerHeight;
+
+  return {
+    x: clamp(x, 8, window.innerWidth - 8),
+    y: clamp(y, 8, window.innerHeight - 8),
+  };
+};
+
+const createCommentPin = (comment: CanvasComment) => {
   const wrapper = document.createElement("div");
   const point = scalePoint(comment);
   const placeTooltipLeft = point.x > window.innerWidth - 320;
@@ -305,116 +211,201 @@ function createCommentPin(comment: CanvasComment) {
 
   wrapper.append(pin, tooltip);
   return wrapper;
-}
+};
 
-function scalePoint(comment: CanvasComment) {
-  const width = Math.max(comment.viewport.width, 1);
-  const height = Math.max(comment.viewport.height, 1);
-  const x = (comment.pointer.x / width) * window.innerWidth;
-  const y = (comment.pointer.y / height) * window.innerHeight;
+const removeCommentOverlay = () => {
+  document.getElementById(OVERLAY_ROOT_ID)?.remove();
+};
 
-  return {
-    x: clamp(x, 8, window.innerWidth - 8),
-    y: clamp(y, 8, window.innerHeight - 8),
+const ensureCommentOverlayRoot = () => {
+  const existing = document.getElementById(OVERLAY_ROOT_ID);
+
+  if (existing instanceof HTMLDivElement) {
+    return existing;
+  }
+
+  const root = document.createElement("div");
+  root.id = OVERLAY_ROOT_ID;
+  root.setAttribute(OVERLAY_ATTRIBUTE, "true");
+  Object.assign(root.style, {
+    inset: "0",
+    pointerEvents: "none",
+    position: "fixed",
+    zIndex: "2147483647",
+  });
+  document.body.append(root);
+
+  return root;
+};
+
+const renderCommentOverlay = (items: CanvasComment[]) => {
+  const root = ensureCommentOverlayRoot();
+  root.replaceChildren(...items.map(createCommentPin));
+};
+
+const loadOpenComments = async (storyId: string) => {
+  const response = await fetch(API_PATH, { headers: API_HEADERS });
+
+  if (!response.ok) {
+    throw new Error(`Failed to load comments: ${response.status}`);
+  }
+
+  const comments = (await response.json()) as CanvasComment[];
+  return comments.filter(
+    (comment) => comment.storyId === storyId && comment.status === "open",
+  );
+};
+
+const createComment = async (
+  target: HTMLElement,
+  event: Pick<MouseEvent, "clientX" | "clientY">,
+  context: StoryContext<Renderer>,
+) => {
+  const note = window.prompt("UI Feedback");
+  const normalizedNote = note?.trim();
+
+  if (!normalizedNote) {
+    return;
+  }
+
+  const anchor = findCommentTarget(target);
+  const rect = anchor.getBoundingClientRect();
+  const comment: CanvasComment = {
+    createdAt: new Date().toISOString(),
+    dataAiComponent: optionalAttribute(anchor, "data-ai-component"),
+    dataAiSource: optionalAttribute(anchor, "data-ai-source"),
+    dataTestId: optionalAttribute(anchor, "data-testid"),
+    id: createId(),
+    note: normalizedNote,
+    pointer: { x: event.clientX, y: event.clientY },
+    rect: {
+      height: rect.height,
+      width: rect.width,
+      x: rect.x,
+      y: rect.y,
+    },
+    selector: selectorFor(anchor),
+    status: "open",
+    storyId: context.id,
+    storyName: context.name,
+    storyTitle: context.title,
+    viewport: { height: window.innerHeight, width: window.innerWidth },
   };
-}
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), Math.max(min, max));
-}
+  try {
+    const response = await fetch(API_PATH, {
+      body: JSON.stringify(comment),
+      headers: { ...API_HEADERS, "content-type": "application/json" },
+      method: "POST",
+    });
 
-function resolveElement(target: EventTarget | null): HTMLElement | null {
-  if (target instanceof HTMLElement) {
-    return target;
+    if (!response.ok) {
+      throw new Error(`Failed to save comment: ${response.status}`);
+    }
+
+    const saved = (await response.json()) as CanvasComment;
+    addons.getChannel().emit(EVENTS.CREATED, saved);
+  } catch (error) {
+    window.alert(
+      error instanceof Error ? error.message : "Failed to save canvas comment",
+    );
   }
+};
 
-  if (target instanceof Node) {
-    return target.parentElement;
-  }
+const isStoryView = (context: StoryContext<Renderer>) =>
+  context.viewMode === undefined || context.viewMode === "story";
 
-  return null;
-}
+const WithCanvasComments = (
+  Story: PartialStoryFn<Renderer>,
+  context: StoryContext<Renderer>,
+) => {
+  const [globals] = useGlobals();
+  const enabled = globals[PARAM_KEY] === true;
+  const commentsVisible = globals[COMMENTS_VISIBLE_PARAM_KEY] !== false;
 
-function findCommentTarget(target: HTMLElement) {
-  return (
-    target.closest<HTMLElement>("[data-ai-source]") ??
-    target.closest<HTMLElement>("[data-testid]") ??
-    target.closest<HTMLElement>("[id]") ??
-    target
-  );
-}
+  useEffect(() => {
+    if (!enabled || !isStoryView(context)) return;
 
-function selectorFor(el: HTMLElement) {
-  const aiSource = el.getAttribute("data-ai-source");
-  if (aiSource) return `[data-ai-source="${escapeCss(aiSource)}"]`;
+    const onClick = (event: MouseEvent) => {
+      const target = resolveElement(event.target);
+      if (!target) return;
+      if (target.closest(`[${OVERLAY_ATTRIBUTE}]`)) return;
 
-  const testId = el.getAttribute("data-testid");
-  if (testId) return `[data-testid="${escapeCss(testId)}"]`;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
 
-  const id = el.id;
-  if (id) return `#${escapeCss(id)}`;
+      const click = { clientX: event.clientX, clientY: event.clientY };
+      window.setTimeout(() => void createComment(target, click, context), 0);
+    };
 
-  return pathSelectorFor(el);
-}
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [enabled, context.id, context.name, context.title, context.viewMode]);
 
-function pathSelectorFor(el: HTMLElement) {
-  const segments: string[] = [];
-  let current: HTMLElement | null = el;
+  useEffect(() => {
+    if (!commentsVisible || !isStoryView(context)) {
+      removeCommentOverlay();
+      return;
+    }
 
-  while (
-    current &&
-    current !== document.body &&
-    current !== document.documentElement &&
-    segments.length < 5
-  ) {
-    segments.unshift(segmentFor(current));
-    current = current.parentElement;
-  }
+    let disposed = false;
+    let items: CanvasComment[] = [];
 
-  return segments.join(" > ") || el.tagName.toLowerCase();
-}
+    const render = () => {
+      if (!disposed) {
+        renderCommentOverlay(items);
+      }
+    };
 
-function segmentFor(el: HTMLElement) {
-  const tag = el.tagName.toLowerCase();
-  const classPart = Array.from(el.classList)
-    .filter((className) => !className.includes(":"))
-    .slice(0, 2)
-    .map((className) => `.${escapeCss(className)}`)
-    .join("");
-  const parent = el.parentElement;
+    const load = async () => {
+      try {
+        items = await loadOpenComments(context.id);
+      } catch {
+        items = [];
+      }
 
-  if (!parent) {
-    return `${tag}${classPart}`;
-  }
+      render();
+    };
 
-  const sameTagSiblings = Array.from(parent.children).filter(
-    (child) => child.tagName === el.tagName,
-  );
+    const channel = addons.getChannel();
+    const onCreated = (item: CanvasComment) => {
+      if (item.storyId !== context.id || item.status !== "open") return;
 
-  if (sameTagSiblings.length <= 1 && classPart) {
-    return `${tag}${classPart}`;
-  }
+      items = [item, ...items.filter((next) => next.id !== item.id)];
+      render();
+    };
+    const onUpdated = (item: CanvasComment) => {
+      items = items.filter((next) => next.id !== item.id);
 
-  const position = sameTagSiblings.indexOf(el) + 1;
-  return `${tag}${classPart}:nth-of-type(${position})`;
-}
+      if (item.storyId === context.id && item.status === "open") {
+        items = [item, ...items];
+      }
 
-function optionalAttribute(el: HTMLElement, name: string) {
-  return el.getAttribute(name) ?? undefined;
-}
+      render();
+    };
+    const onDeleted = (item: CanvasComment) => {
+      items = items.filter((next) => next.id !== item.id);
+      render();
+    };
 
-function createId() {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
+    void load();
+    channel.on(EVENTS.CREATED, onCreated);
+    channel.on(EVENTS.DELETED, onDeleted);
+    channel.on(EVENTS.UPDATED, onUpdated);
+    window.addEventListener("resize", render);
 
-  return `canvas-comment-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
+    return () => {
+      disposed = true;
+      channel.off(EVENTS.CREATED, onCreated);
+      channel.off(EVENTS.DELETED, onDeleted);
+      channel.off(EVENTS.UPDATED, onUpdated);
+      window.removeEventListener("resize", render);
+      removeCommentOverlay();
+    };
+  }, [commentsVisible, context.id, context.viewMode]);
 
-function escapeCss(value: string) {
-  if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
-    return CSS.escape(value);
-  }
+  return Story();
+};
 
-  return value.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
-}
+export const decorators = [WithCanvasComments];
