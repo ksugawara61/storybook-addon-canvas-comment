@@ -24,6 +24,26 @@ const isViewport = (value: unknown): value is CanvasComment["viewport"] =>
   typeof value.width === "number" &&
   typeof value.height === "number";
 
+/**
+ * Shallow validation for the optional domContext field.
+ * Existing comments without domContext still pass (undefined is valid).
+ */
+const isOptionalDomContext = (
+  value: unknown,
+): value is CanvasComment["domContext"] => {
+  if (value === undefined) {
+    return true;
+  }
+
+  return (
+    isRecord(value) &&
+    typeof value.capturedAt === "string" &&
+    isViewport(value.viewport) &&
+    isRecord(value.target) &&
+    isRecord(value.domTree)
+  );
+};
+
 export const isCanvasComment = (value: unknown): value is CanvasComment => {
   if (!isRecord(value)) {
     return false;
@@ -43,7 +63,8 @@ export const isCanvasComment = (value: unknown): value is CanvasComment => {
     isPoint(value.pointer) &&
     isViewport(value.viewport) &&
     typeof value.createdAt === "string" &&
-    isCanvasCommentStatus(value.status)
+    isCanvasCommentStatus(value.status) &&
+    isOptionalDomContext(value.domContext)
   );
 };
 

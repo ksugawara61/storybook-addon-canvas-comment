@@ -1,4 +1,5 @@
 import {
+  type CanvasCommentDomMapEngine,
   type CanvasCommentDomMapOptions,
   type CanvasCommentDomMapStatus,
   createCanvasCommentDomMap,
@@ -6,19 +7,37 @@ import {
 } from "../dom-map";
 
 const HELP = `Usage:
-  pnpm --filter storybook-addon-canvas-comments dom-map -- --storybook-url <url> [options]
+  pnpm --filter storybook-addon-canvas-comments dom-map -- [options]
 
 Options:
-  --storybook-url <url>       Running Storybook URL, for example http://localhost:6006
-  --story-id <id>             Storybook story id. If omitted, maps every story that has comments.
+  --engine <snapshot|playwright>
+                              How to map comments to DOM elements.
+                              snapshot (default): reads comments.json from disk; no browser
+                              or dev server required. Comments must have been created with
+                              this version of the addon to include a DOM snapshot.
+                              playwright: launches a headless Chromium browser against a
+                              running Storybook dev server (requires --storybook-url).
+  --comments-file <path>      Path to comments.json. Only used with --engine=snapshot.
+                              Defaults to .storybook/canvas-comments/comments.json relative
+                              to the current working directory.
+  --storybook-url <url>       Running Storybook URL, e.g. http://localhost:6006.
+                              Required when using --engine=playwright.
+  --story-id <id>             Storybook story id. If omitted, maps every story that has
+                              comments.
   --status <open|resolved|all>
                               Comments to include. Defaults to open.
-  --viewport <width>x<height> Browser viewport. Defaults to 390x844.
-  --include-dom-tree          Include a bounded #storybook-root DOM tree in the JSON output.
-  --skip-loading-wait         Do not wait for common loading indicators/text to disappear.
-  --timeout-ms <ms>           Story load timeout. Defaults to 15000.
-  --max-dom-depth <number>    DOM tree depth when --include-dom-tree is set. Defaults to 6.
-  --max-dom-children <number> DOM children per node when --include-dom-tree is set. Defaults to 20.
+  --viewport <width>x<height> Browser viewport (playwright engine only). Defaults to
+                              390x844.
+  --include-dom-tree          Include a bounded #storybook-root DOM tree in the JSON
+                              output.
+  --skip-loading-wait         Do not wait for common loading indicators/text to disappear
+                              (playwright engine only).
+  --timeout-ms <ms>           Story load timeout in ms (playwright engine only). Defaults
+                              to 15000.
+  --max-dom-depth <number>    DOM tree depth when --include-dom-tree is set. Defaults to
+                              6.
+  --max-dom-children <number> DOM children per node when --include-dom-tree is set.
+                              Defaults to 20.
   --max-text-length <number>  Text truncation length. Defaults to 240.
   --help                      Show this help.
 `;
@@ -43,6 +62,16 @@ const parseStatus = (value: string): CanvasCommentDomMapStatus => {
   );
 };
 
+const parseEngine = (value: string): CanvasCommentDomMapEngine => {
+  if (value === "snapshot" || value === "playwright") {
+    return value;
+  }
+
+  throw new Error(
+    `Invalid --engine "${value}". Expected snapshot or playwright.`,
+  );
+};
+
 const HELP_OPTIONS = new Set(["--help", "-h"]);
 
 const FLAG_OPTION_READERS = {
@@ -55,6 +84,12 @@ const FLAG_OPTION_READERS = {
 } satisfies Record<string, (options: CanvasCommentDomMapOptions) => void>;
 
 const VALUE_OPTION_READERS = {
+  "--comments-file": (options: CanvasCommentDomMapOptions, value: string) => {
+    options.commentsFile = value;
+  },
+  "--engine": (options: CanvasCommentDomMapOptions, value: string) => {
+    options.engine = parseEngine(value);
+  },
   "--max-dom-children": (
     options: CanvasCommentDomMapOptions,
     value: string,
@@ -106,9 +141,7 @@ const readRequiredValue = (args: string[], index: number, option: string) => {
 };
 
 const parseArgs = (args: string[]): CanvasCommentDomMapOptions | "help" => {
-  const options: CanvasCommentDomMapOptions = {
-    storybookUrl: "",
-  };
+  const options: CanvasCommentDomMapOptions = {};
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -135,9 +168,8 @@ const parseArgs = (args: string[]): CanvasCommentDomMapOptions | "help" => {
     throw new Error(`Unknown option: ${arg}`);
   }
 
-  if (!options.storybookUrl) {
-    throw new Error("--storybook-url is required.");
-  }
+  // --storybook-url is only required for the playwright engine.
+  // Validation happens inside createCanvasCommentDomMap for that engine.
 
   return options;
 };

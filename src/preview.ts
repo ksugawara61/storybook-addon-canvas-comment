@@ -11,6 +11,7 @@ import {
   EVENTS,
   PARAM_KEY,
 } from "./constants";
+import { summarizeStory } from "./dom-summary";
 import type { CanvasComment } from "./types";
 
 const OVERLAY_ROOT_ID = "storybook-addon-canvas-comments-overlay";
@@ -270,12 +271,28 @@ const createComment = async (
 
   const anchor = findCommentTarget(target);
   const rect = anchor.getBoundingClientRect();
+  const id = createId();
+  const createdAt = new Date().toISOString();
+  const viewport = { height: window.innerHeight, width: window.innerWidth };
+
+  const storyRoot = document.querySelector("#storybook-root") ?? document.body;
+  const { domTree, target: domTarget } = summarizeStory(storyRoot, {
+    anchor,
+    commentId: id,
+  });
+
   const comment: CanvasComment = {
-    createdAt: new Date().toISOString(),
+    createdAt,
     dataAiComponent: optionalAttribute(anchor, "data-ai-component"),
     dataAiSource: optionalAttribute(anchor, "data-ai-source"),
     dataTestId: optionalAttribute(anchor, "data-testid"),
-    id: createId(),
+    domContext: {
+      capturedAt: createdAt,
+      domTree,
+      target: domTarget,
+      viewport,
+    },
+    id,
     note: normalizedNote,
     pointer: { x: event.clientX, y: event.clientY },
     rect: {
@@ -289,7 +306,7 @@ const createComment = async (
     storyId: context.id,
     storyName: context.name,
     storyTitle: context.title,
-    viewport: { height: window.innerHeight, width: window.innerWidth },
+    viewport,
   };
 
   try {

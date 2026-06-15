@@ -17,6 +17,40 @@ export type CanvasCommentViewport = {
   height: number;
 };
 
+export type DomElementSummary = {
+  ancestors: Array<{
+    attributes: Record<string, string>;
+    selector: string;
+    tagName: string;
+  }>;
+  ariaLabel?: string;
+  attributes: Record<string, string>;
+  domPath: string;
+  rect: CanvasCommentRect;
+  role?: string;
+  selector: string;
+  tagName: string;
+  text?: string;
+};
+
+export type DomTreeNode = {
+  attributes: Record<string, string>;
+  children?: DomTreeNode[];
+  commentIds: string[];
+  rect: CanvasCommentRect;
+  selector: string;
+  tagName: string;
+  text?: string;
+  truncatedChildren?: number;
+};
+
+export type CanvasCommentDomContext = {
+  capturedAt: string;
+  domTree: DomTreeNode;
+  target: DomElementSummary;
+  viewport: CanvasCommentViewport;
+};
+
 export type CanvasComment = {
   id: string;
   storyId: string;
@@ -32,4 +66,5 @@ export type CanvasComment = {
   viewport: CanvasCommentViewport;
   createdAt: string;
   status: CanvasCommentStatus;
+  domContext?: CanvasCommentDomContext;
 };

@@ -1,6 +1,60 @@
-import { describe, expect, it } from "vitest";
-import { filterCanvasComments, parseViewport, scalePoint } from "./dom-map";
-import type { CanvasComment } from "./types";
+import fs from "node:fs/promises";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  createCanvasCommentDomMap,
+  filterCanvasComments,
+  loadCanvasCommentsFromDisk,
+  parseViewport,
+  scalePoint,
+} from "./dom-map";
+import type {
+  CanvasComment,
+  CanvasCommentDomContext,
+  DomElementSummary,
+  DomTreeNode,
+} from "./types";
+
+// Hoist to module level so vitest can apply the factory before imports resolve.
+vi.mock("node:fs/promises", () => ({
+  default: {
+    readFile: vi.fn(),
+  },
+}));
+
+// ---------------------------------------------------------------------------
+// Factories
+// ---------------------------------------------------------------------------
+
+const createDomElementSummary = (
+  overrides: Partial<DomElementSummary> = {},
+): DomElementSummary => ({
+  ancestors: [],
+  attributes: {},
+  domPath: "div#storybook-root > button.submit",
+  rect: { height: 40, width: 80, x: 80, y: 180 },
+  selector: "div#storybook-root > button.submit",
+  tagName: "button",
+  ...overrides,
+});
+
+const createDomTree = (overrides: Partial<DomTreeNode> = {}): DomTreeNode => ({
+  attributes: { id: "storybook-root" },
+  commentIds: [],
+  rect: { height: 800, width: 400, x: 0, y: 0 },
+  selector: "div#storybook-root",
+  tagName: "div",
+  ...overrides,
+});
+
+const createDomContext = (
+  overrides: Partial<CanvasCommentDomContext> = {},
+): CanvasCommentDomContext => ({
+  capturedAt: "2026-06-12T00:00:00.000Z",
+  domTree: createDomTree(),
+  target: createDomElementSummary(),
+  viewport: { height: 800, width: 400 },
+  ...overrides,
+});
 
 const createComment = (
   overrides: Partial<CanvasComment> = {},
@@ -19,25 +73,23 @@ const createComment = (
   ...overrides,
 });
 
+// ---------------------------------------------------------------------------
+// filterCanvasComments
+// ---------------------------------------------------------------------------
+
 describe("filterCanvasComments", () => {
   it("filters by story id and status", () => {
     const comments = [
       createComment(),
-      createComment({
-        id: "comment-2",
-        status: "resolved",
-      }),
-      createComment({
-        id: "comment-3",
-        storyId: "card--default",
-      }),
+      createComment({ id: "comment-2", status: "resolved" }),
+      createComment({ id: "comment-3", storyId: "card--default" }),
     ];
 
     expect(
       filterCanvasComments(comments, {
         status: "open",
         storyId: "button--default",
-      }).map((comment) => comment.id),
+      }).map((c) => c.id),
     ).toEqual(["comment-1"]);
   });
 
@@ -48,12 +100,14 @@ describe("filterCanvasComments", () => {
     ];
 
     expect(
-      filterCanvasComments(comments, {
-        status: "all",
-      }).map((comment) => comment.id),
+      filterCanvasComments(comments, { status: "all" }).map((c) => c.id),
     ).toEqual(["comment-1", "comment-2"]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// parseViewport
+// ---------------------------------------------------------------------------
 
 describe("parseViewport", () => {
   it("parses width and height", () => {
@@ -66,6 +120,10 @@ describe("parseViewport", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// scalePoint
+// ---------------------------------------------------------------------------
 
 describe("scalePoint", () => {
   it("scales a stored pointer into the target viewport", () => {
@@ -86,5 +144,139 @@ describe("scalePoint", () => {
         { height: 100, width: 100 },
       ),
     ).toEqual({ x: 8, y: 92 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// loadCanvasCommentsFromDisk
+// ---------------------------------------------------------------------------
+
+describe("loadCanvasCommentsFromDisk", () => {
+  beforeEach(() => {
+    vi.mocked(fs.readFile).mockReset();
+  });
+
+  it.each([
+    {
+      label: "file does not exist (ENOENT)",
+      setup: () => {
+        vi.mocked(fs.readFile).mockRejectedValue(
+          Object.assign(new Error("ENOENT"), { code: "ENOENT" }),
+        );
+      },
+    },
+    {
+      label: "malformed JSON",
+      setup: () => {
+        vi.mocked(fs.readFile).mockResolvedValue("not valid json {{{" as never);
+      },
+    },
+    {
+      label: "non-array JSON value",
+      setup: () => {
+        vi.mocked(fs.readFile).mockResolvedValue(
+          JSON.stringify({ not: "array" }) as never,
+        );
+      },
+    },
+  ])("returns empty array when $label", async ({ setup }) => {
+    setup();
+    expect(await loadCanvasCommentsFromDisk("/path.json")).toEqual([]);
+  });
+
+  it("parses valid comments", async () => {
+    const comment = createComment();
+    vi.mocked(fs.readFile).mockResolvedValue(
+      JSON.stringify([comment]) as never,
+    );
+
+    expect(await loadCanvasCommentsFromDisk("/path.json")).toEqual([comment]);
+  });
+
+  it("filters out invalid entries", async () => {
+    const comment = createComment();
+    vi.mocked(fs.readFile).mockResolvedValue(
+      JSON.stringify([comment, { invalid: true }]) as never,
+    );
+
+    expect(await loadCanvasCommentsFromDisk("/path.json")).toEqual([comment]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createCanvasCommentDomMap (snapshot engine)
+// ---------------------------------------------------------------------------
+
+describe("createCanvasCommentDomMap (snapshot engine)", () => {
+  beforeEach(() => {
+    vi.mocked(fs.readFile).mockReset();
+  });
+
+  const mockFile = (comments: CanvasComment[]) => {
+    vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(comments) as never);
+  };
+
+  it("maps comment with domContext to matchType:'snapshot' with target", async () => {
+    const domContext = createDomContext();
+    mockFile([createComment({ domContext })]);
+
+    const result = await createCanvasCommentDomMap({ engine: "snapshot" });
+
+    expect(result.stories[0]?.comments[0]).toMatchObject({
+      matchType: "snapshot",
+      target: domContext.target,
+    });
+  });
+
+  it("maps comment without domContext to matchType:'none' with null target and error", async () => {
+    mockFile([createComment()]);
+
+    const result = await createCanvasCommentDomMap({ engine: "snapshot" });
+
+    expect(result.stories[0]?.comments[0]).toMatchObject({
+      matchType: "none",
+      target: null,
+    });
+    expect(result.stories[0]?.comments[0]?.error).toContain(
+      "--engine=playwright",
+    );
+  });
+
+  it("includes domTree from the first snapshot when includeDomTree is true", async () => {
+    const domTree = createDomTree({ commentIds: ["comment-1"] });
+    mockFile([createComment({ domContext: createDomContext({ domTree }) })]);
+
+    const result = await createCanvasCommentDomMap({
+      engine: "snapshot",
+      includeDomTree: true,
+    });
+
+    expect(result.stories[0]?.domTree).toEqual(domTree);
+  });
+
+  it("omits domTree when includeDomTree is false", async () => {
+    mockFile([createComment({ domContext: createDomContext() })]);
+
+    const result = await createCanvasCommentDomMap({ engine: "snapshot" });
+
+    expect(result.stories[0]?.domTree).toBeUndefined();
+  });
+
+  it("returns empty stories when no comments match the status filter", async () => {
+    // Default status is "open"; resolved comment should be excluded.
+    mockFile([createComment({ status: "resolved" })]);
+
+    const result = await createCanvasCommentDomMap({ engine: "snapshot" });
+
+    expect(result.stories).toHaveLength(0);
+  });
+
+  it("uses domContext viewport as the story viewport", async () => {
+    const viewport = { height: 1200, width: 600 };
+    mockFile([createComment({ domContext: createDomContext({ viewport }) })]);
+
+    const result = await createCanvasCommentDomMap({ engine: "snapshot" });
+
+    expect(result.stories[0]?.viewport).toEqual(viewport);
   });
 });
