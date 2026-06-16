@@ -196,6 +196,12 @@ const Panel = () => {
         throw new Error(`Failed to load comments: ${response.status}`);
       }
 
+      // 静的ビルド (Cloudflare Pages SPA fallback) では HTML が返るため JSON でないならスキップ。
+      const contentType = response.headers.get("content-type") ?? "";
+      if (!contentType.includes("application/json")) {
+        return;
+      }
+
       setItems((await response.json()) as CanvasComment[]);
       setError(undefined);
     } catch (loadError) {

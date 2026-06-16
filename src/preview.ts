@@ -402,6 +402,11 @@ const renderCommentOverlay = (items: CanvasComment[]) => {
 };
 
 const loadOpenComments = async (storyId: string) => {
+  // API ミドルウェアは vite dev 専用のため、静的ビルド (PROD) では fetch しない。
+  // fetch すると Cloudflare の SPA fallback が HTML を返し、相対モジュール解決が
+  // 再帰的にネストして無限ループになる。
+  if (import.meta.env.PROD) return [] as CanvasComment[];
+
   const response = await fetch(API_PATH, { headers: API_HEADERS });
 
   if (!response.ok) {
@@ -464,6 +469,11 @@ const createComment = async (
     storyTitle: context.title,
     viewport,
   };
+
+  if (import.meta.env.PROD) {
+    window.alert("UI フィードバックは dev サーバでのみ保存できます");
+    return;
+  }
 
   try {
     const response = await fetch(API_PATH, {
