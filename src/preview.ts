@@ -11,7 +11,7 @@ import {
   EVENTS,
   PARAM_KEY,
 } from "./constants";
-import { summarizeStory } from "./dom-summary";
+import { summarizeTarget } from "./dom-summary";
 import type { CanvasComment } from "./types";
 
 const OVERLAY_ROOT_ID = "storybook-addon-canvas-comments-overlay";
@@ -432,8 +432,7 @@ const createComment = async (
   const createdAt = new Date().toISOString();
   const viewport = { height: window.innerHeight, width: window.innerWidth };
 
-  const storyRoot = document.querySelector("#storybook-root") ?? document.body;
-  const { domTree, target: domTarget } = summarizeStory(storyRoot, {
+  const { domTree, target: domTarget } = summarizeTarget({
     anchor,
     commentId: id,
   });

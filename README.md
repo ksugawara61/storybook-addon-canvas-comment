@@ -99,7 +99,7 @@ CLI は次の順でコメント対象を解決します。
 1. 保存済み `selector` を `document.querySelector` で解決
 2. 解決できない場合、保存時 viewport から現在 viewport に pointer を scale し、`document.elementsFromPoint` で fallback
 
-出力には comment の保存座標、現在座標、対応 DOM 要素の tag / attributes / rect / text / ancestor 情報が含まれます。`--include-dom-tree` を付けると、`#storybook-root` 配下の bounded DOM tree も含めます。
+出力には comment の保存座標、現在座標、対応 DOM 要素の tag / attributes / rect / text / ancestor 情報が含まれます。`--include-dom-tree` を付けると bounded DOM tree も含めます。snapshot エンジンでは **コメント対象要素を起点とした subtree** のみを保持するため AI エージェントのコンテキスト消費を抑えられます。playwright エンジンでは従来どおり `#storybook-root` 配下の subtree になります。
 
 DOM 取得前には `role="progressbar"`、`loading` / `spinner` / `skeleton` 系の属性、`読み込み中` / `Loading` テキストが消えるまで待機します。Loading 状態そのものの story を調べる場合は `--skip-loading-wait` を指定します。
 

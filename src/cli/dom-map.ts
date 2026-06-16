@@ -28,8 +28,9 @@ Options:
                               Comments to include. Defaults to open.
   --viewport <width>x<height> Browser viewport (playwright engine only). Defaults to
                               390x844.
-  --include-dom-tree          Include a bounded #storybook-root DOM tree in the JSON
-                              output.
+  --include-dom-tree          Include a bounded DOM tree in the JSON output.
+                              snapshot engine: subtree rooted at the anchor element.
+                              playwright engine: full #storybook-root subtree.
   --skip-loading-wait         Do not wait for common loading indicators/text to disappear
                               (playwright engine only).
   --timeout-ms <ms>           Story load timeout in ms (playwright engine only). Defaults

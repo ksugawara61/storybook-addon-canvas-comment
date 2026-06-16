@@ -5,7 +5,7 @@
  *   1. Directly imported by preview.ts (runs in the live browser).
  *   2. Bundled as an IIFE via esbuild.transform and injected into a Playwright
  *      page via page.addScriptTag — the entry point is exposed as
- *      `window.__canvasCommentsSummarizeStory`.
+ *      `window.__canvasCommentsSummarizeTarget`.
  *
  * Keep this file free of runtime imports. Type-only imports are fine.
  */
@@ -261,14 +261,15 @@ const buildDomTree = (
 };
 
 /**
- * Summarize the story root DOM tree and the clicked anchor element.
+ * Summarize the clicked anchor element and its descendant subtree.
  *
  * @returns `{ target, domTree }` where `target` is a summary of the anchor
- *   element and `domTree` is the bounded story root tree with the anchor node
- *   marked via `commentIds`.
+ *   element (including its ancestors up to `#storybook-root`) and `domTree`
+ *   is the bounded subtree rooted at the anchor with the anchor node marked
+ *   via `commentIds`. Only the anchor's subtree is captured — not the whole
+ *   story root — to minimise AI agent context consumption.
  */
-export const summarizeStory = (
-  root: Element,
+export const summarizeTarget = (
   options: SummarizeStoryOptions,
 ): SummarizeStoryResult => {
   const {
@@ -282,7 +283,7 @@ export const summarizeStory = (
   const normalizeText = makeNormalizeText(maxTextLength);
   const target = summarizeElement(anchor, normalizeText);
   const domTree = buildDomTree(
-    root,
+    anchor,
     0,
     anchor,
     commentId,
@@ -290,12 +291,12 @@ export const summarizeStory = (
     maxDomChildren,
     normalizeText,
   ) ?? {
-    attributes: readAttributes(root),
-    commentIds: root === anchor ? [commentId] : [],
-    rect: toRect(root),
-    selector: domPathFor(root),
-    tagName: root.tagName.toLowerCase(),
-    text: textFor(root, normalizeText),
+    attributes: readAttributes(anchor),
+    commentIds: [commentId],
+    rect: toRect(anchor),
+    selector: domPathFor(anchor),
+    tagName: anchor.tagName.toLowerCase(),
+    text: textFor(anchor, normalizeText),
   };
 
   return { domTree, target };
@@ -307,11 +308,11 @@ export const summarizeStory = (
  */
 if (
   typeof window !== "undefined" &&
-  !("__canvasCommentsSummarizeStory" in window)
+  !("__canvasCommentsSummarizeTarget" in window)
 ) {
   (
     window as unknown as {
-      __canvasCommentsSummarizeStory: typeof summarizeStory;
+      __canvasCommentsSummarizeTarget: typeof summarizeTarget;
     }
-  ).__canvasCommentsSummarizeStory = summarizeStory;
+  ).__canvasCommentsSummarizeTarget = summarizeTarget;
 }
