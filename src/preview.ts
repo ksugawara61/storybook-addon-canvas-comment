@@ -16,6 +16,7 @@ import type { CanvasComment } from "./types";
 
 const OVERLAY_ROOT_ID = "storybook-addon-canvas-comments-overlay";
 const INPUT_ROOT_ID = "storybook-addon-canvas-comments-input";
+const DRAFT_PIN_ID = "storybook-addon-canvas-comments-draft-pin";
 const OVERLAY_ATTRIBUTE = "data-canvas-comments-overlay";
 
 export const globalTypes = {
@@ -145,6 +146,70 @@ const scalePoint = (comment: CanvasComment) => {
 
 const removeCommentInputRoot = () => {
   document.getElementById(INPUT_ROOT_ID)?.remove();
+};
+
+const showDraftPin = (x: number, y: number) => {
+  document.getElementById(DRAFT_PIN_ID)?.remove();
+
+  const ARM = 8;
+  const GAP = 5;
+  const SIZE = (GAP + ARM) * 2 + 2;
+
+  const root = document.createElement("div");
+  root.id = DRAFT_PIN_ID;
+  root.setAttribute(OVERLAY_ATTRIBUTE, "true");
+  Object.assign(root.style, {
+    height: `${SIZE}px`,
+    left: `${x}px`,
+    pointerEvents: "none",
+    position: "fixed",
+    top: `${y}px`,
+    transform: "translate(-50%, -50%)",
+    width: `${SIZE}px`,
+    zIndex: "2147483647",
+  });
+
+  const circle = document.createElement("div");
+  circle.setAttribute(OVERLAY_ATTRIBUTE, "true");
+  Object.assign(circle.style, {
+    background: "rgba(255, 255, 255, 0.9)",
+    borderRadius: "999px",
+    boxShadow: "0 0 0 1.5px rgba(0,0,0,0.4)",
+    height: "8px",
+    left: "50%",
+    position: "absolute",
+    top: "50%",
+    transform: "translate(-50%, -50%)",
+    width: "8px",
+  });
+
+  const half = SIZE / 2;
+  for (const [x2, y2, w, h] of [
+    [half - 1, half - GAP - ARM, 2, ARM],
+    [half - 1, half + GAP, 2, ARM],
+    [half - GAP - ARM, half - 1, ARM, 2],
+    [half + GAP, half - 1, ARM, 2],
+  ] as const) {
+    const arm = document.createElement("div");
+    arm.setAttribute(OVERLAY_ATTRIBUTE, "true");
+    Object.assign(arm.style, {
+      background: "rgba(255, 255, 255, 0.9)",
+      boxShadow: "0 0 0 0.5px rgba(0,0,0,0.4)",
+      height: `${h}px`,
+      left: `${x2}px`,
+      position: "absolute",
+      top: `${y2}px`,
+      width: `${w}px`,
+    });
+    root.append(arm);
+  }
+
+  root.append(circle);
+  document.body.append(root);
+};
+
+const removeDraftPin = () => {
+  document.getElementById(DRAFT_PIN_ID)?.remove();
 };
 
 const onCommentInput = (
@@ -472,7 +537,9 @@ const createComment = async (
   event: Pick<MouseEvent, "clientX" | "clientY">,
   context: StoryContext<Renderer>,
 ) => {
+  showDraftPin(event.clientX, event.clientY);
   const note = await promptCommentNote({ x: event.clientX, y: event.clientY });
+  removeDraftPin();
   const normalizedNote = note?.trim();
 
   if (!normalizedNote) {
