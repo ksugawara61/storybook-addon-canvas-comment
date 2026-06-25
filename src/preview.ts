@@ -224,6 +224,7 @@ const promptCommentNote = (point: {
       background: "rgba(255, 255, 255, 0.08)",
       border: "1px solid rgba(255, 255, 255, 0.2)",
       borderRadius: "4px",
+      boxSizing: "border-box",
       color: "#ffffff",
       font: "inherit",
       outline: "none",
