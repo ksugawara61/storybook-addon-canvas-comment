@@ -330,42 +330,89 @@ const createCommentPin = (comment: CanvasComment) => {
 
   const tooltip = document.createElement("div");
   tooltip.setAttribute(OVERLAY_ATTRIBUTE, "true");
-  tooltip.textContent = comment.note;
   Object.assign(tooltip.style, {
     background: "#111827",
     border: "1px solid rgba(255, 255, 255, 0.18)",
     borderRadius: "6px",
     boxShadow: "0 12px 32px rgba(0, 0, 0, 0.32)",
     color: "#ffffff",
+    display: "flex",
+    flexDirection: "column",
     font: "12px/1.45 system-ui, sans-serif",
     left: placeTooltipLeft ? "auto" : "24px",
     maxWidth: "280px",
     minWidth: "120px",
     opacity: "0",
     padding: "8px 10px",
-    pointerEvents: "none",
+    pointerEvents: "auto",
     position: "absolute",
     right: placeTooltipLeft ? "24px" : "auto",
     top: "50%",
     transform: "translateY(-50%)",
     transition: "opacity 120ms ease, visibility 120ms ease",
     visibility: "hidden",
+  });
+
+  const noteText = document.createElement("div");
+  noteText.textContent = comment.note;
+  Object.assign(noteText.style, {
+    marginBottom: "8px",
     whiteSpace: "pre-wrap",
   });
 
+  const tooltipActions = document.createElement("div");
+  tooltipActions.setAttribute(OVERLAY_ATTRIBUTE, "true");
+  Object.assign(tooltipActions.style, {
+    borderTop: "1px solid rgba(255, 255, 255, 0.12)",
+    display: "flex",
+    justifyContent: "flex-end",
+    paddingTop: "6px",
+  });
+
+  const resolveButton = document.createElement("button");
+  resolveButton.type = "button";
+  resolveButton.textContent = "解決";
+  resolveButton.setAttribute(OVERLAY_ATTRIBUTE, "true");
+  Object.assign(resolveButton.style, {
+    background: "#10b981",
+    border: "none",
+    borderRadius: "4px",
+    color: "#ffffff",
+    cursor: "pointer",
+    font: "inherit",
+    fontSize: "11px",
+    fontWeight: "600",
+    padding: "3px 8px",
+  });
+  resolveButton.addEventListener("click", (e) => {
+    e.stopPropagation();
+    resolveButton.disabled = true;
+    resolveButton.style.opacity = "0.5";
+    resolveButton.style.cursor = "default";
+    void resolveComment(comment.id);
+  });
+
+  tooltipActions.append(resolveButton);
+  tooltip.append(noteText, tooltipActions);
+
+  let hideTimeout: ReturnType<typeof setTimeout> | undefined;
+
   const show = () => {
+    clearTimeout(hideTimeout);
     tooltip.style.opacity = "1";
     tooltip.style.visibility = "visible";
   };
   const hide = () => {
-    tooltip.style.opacity = "0";
-    tooltip.style.visibility = "hidden";
+    hideTimeout = setTimeout(() => {
+      tooltip.style.opacity = "0";
+      tooltip.style.visibility = "hidden";
+    }, 100);
   };
 
+  wrapper.addEventListener("mouseenter", show);
+  wrapper.addEventListener("mouseleave", hide);
   pin.addEventListener("focus", show);
-  pin.addEventListener("mouseenter", show);
   pin.addEventListener("blur", hide);
-  pin.addEventListener("mouseleave", hide);
 
   wrapper.append(pin, tooltip);
   return wrapper;
@@ -491,6 +538,29 @@ const createComment = async (
   } catch (error) {
     window.alert(
       error instanceof Error ? error.message : "Failed to save canvas comment",
+    );
+  }
+};
+
+const resolveComment = async (id: string) => {
+  if (import.meta.env.PROD) return;
+
+  try {
+    const response = await fetch(`${API_PATH}/${encodeURIComponent(id)}`, {
+      body: JSON.stringify({ status: "resolved" }),
+      headers: { ...API_HEADERS, "content-type": "application/json" },
+      method: "PATCH",
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to resolve comment: ${response.status}`);
+    }
+
+    const updated = (await response.json()) as CanvasComment;
+    addons.getChannel().emit(EVENTS.UPDATED, updated);
+  } catch (error) {
+    window.alert(
+      error instanceof Error ? error.message : "Failed to resolve comment",
     );
   }
 };
