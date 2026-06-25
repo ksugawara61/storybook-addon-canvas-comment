@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS canvas_comments (
+  id TEXT PRIMARY KEY NOT NULL,
+  story_id TEXT NOT NULL,
+  story_title TEXT NOT NULL,
+  story_name TEXT NOT NULL,
+  note TEXT NOT NULL,
+  selector TEXT NOT NULL,
+  data_test_id TEXT,
+  data_ai_component TEXT,
+  data_ai_source TEXT,
+  rect TEXT NOT NULL,
+  pointer TEXT NOT NULL,
+  viewport TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open',
+  dom_context TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_canvas_comments_story_id ON canvas_comments (story_id);
+CREATE INDEX IF NOT EXISTS idx_canvas_comments_status ON canvas_comments (status);

@@ -6,5 +6,6 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["node", "react", "vite/client"]
   },
+  "exclude": ["src/cloudflare"],
   "include": ["src"]
 }

@@ -16,9 +16,9 @@ import {
 import {
   ADDON_ID,
   API_HEADERS,
-  API_PATH,
   COMMENTS_VISIBLE_PARAM_KEY,
   EVENTS,
+  getApiPath,
   OVERLAY_TOOL_ID,
   PANEL_ID,
   PARAM_KEY,
@@ -206,7 +206,7 @@ const Panel = () => {
 
   const loadComments = useCallback(async () => {
     try {
-      const response = await fetch(API_PATH, { headers: API_HEADERS });
+      const response = await fetch(getApiPath(), { headers: API_HEADERS });
 
       if (!response.ok) {
         throw new Error(`Failed to load comments: ${response.status}`);
@@ -231,11 +231,14 @@ const Panel = () => {
   const updateStatus = useCallback(
     async (id: string, status: CanvasCommentStatus) => {
       try {
-        const response = await fetch(`${API_PATH}/${encodeURIComponent(id)}`, {
-          body: JSON.stringify({ status }),
-          headers: { ...API_HEADERS, "content-type": "application/json" },
-          method: "PATCH",
-        });
+        const response = await fetch(
+          `${getApiPath()}/${encodeURIComponent(id)}`,
+          {
+            body: JSON.stringify({ status }),
+            headers: { ...API_HEADERS, "content-type": "application/json" },
+            method: "PATCH",
+          },
+        );
 
         if (!response.ok) {
           throw new Error(`Failed to update status: ${response.status}`);
@@ -269,7 +272,7 @@ const Panel = () => {
 
     try {
       const response = await fetch(
-        `${API_PATH}/${encodeURIComponent(item.id)}`,
+        `${getApiPath()}/${encodeURIComponent(item.id)}`,
         {
           headers: API_HEADERS,
           method: "DELETE",

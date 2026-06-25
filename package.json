@@ -1,4 +1,7 @@
 {
+  "dependencies": {
+    "@libsql/client": "catalog:"
+  },
   "devDependencies": {
     "@playwright/test": "catalog:",
     "@storybook/icons": "catalog:",

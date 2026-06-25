@@ -1,0 +1,15 @@
+name = "your-storybook"
+compatibility_date = "2024-01-01"
+pages_build_output_dir = "storybook-static"
+
+# Turso 接続情報は Cloudflare Pages の Environment Variables で設定してください。
+# ダッシュボード: Settings > Environment variables
+#
+# 必須の環境変数:
+#   TURSO_DATABASE_URL  = "libsql://your-db.turso.io"
+#   TURSO_AUTH_TOKEN    = "your-auth-token"
+#
+# ローカル開発 (wrangler pages dev) 用にここで上書きできます:
+# [vars]
+# TURSO_DATABASE_URL = "libsql://your-db.turso.io"
+# TURSO_AUTH_TOKEN = "your-auth-token"

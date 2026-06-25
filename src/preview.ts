@@ -9,6 +9,7 @@ import {
   API_PATH,
   COMMENTS_VISIBLE_PARAM_KEY,
   EVENTS,
+  getApiPath,
   PARAM_KEY,
 } from "./constants";
 import { summarizeTarget } from "./dom-summary";
@@ -515,12 +516,13 @@ const renderCommentOverlay = (items: CanvasComment[]) => {
 };
 
 const loadOpenComments = async (storyId: string) => {
-  // API ミドルウェアは vite dev 専用のため、静的ビルド (PROD) では fetch しない。
-  // fetch すると Cloudflare の SPA fallback が HTML を返し、相対モジュール解決が
-  // 再帰的にネストして無限ループになる。
-  if (import.meta.env.PROD) return [] as CanvasComment[];
+  const apiPath = getApiPath();
+  // カスタム apiUrl 未設定の PROD ビルドでは dev server が存在しないためスキップ。
+  // Cloudflare の SPA fallback が HTML を返し無限ループになるのを防ぐ。
+  if (import.meta.env.PROD && apiPath === API_PATH)
+    return [] as CanvasComment[];
 
-  const response = await fetch(API_PATH, { headers: API_HEADERS });
+  const response = await fetch(apiPath, { headers: API_HEADERS });
 
   if (!response.ok) {
     throw new Error(`Failed to load comments: ${response.status}`);
@@ -585,13 +587,14 @@ const createComment = async (
     viewport,
   };
 
-  if (import.meta.env.PROD) {
+  const apiPath = getApiPath();
+  if (import.meta.env.PROD && apiPath === API_PATH) {
     window.alert("UI フィードバックは dev サーバでのみ保存できます");
     return;
   }
 
   try {
-    const response = await fetch(API_PATH, {
+    const response = await fetch(apiPath, {
       body: JSON.stringify(comment),
       headers: { ...API_HEADERS, "content-type": "application/json" },
       method: "POST",
@@ -611,10 +614,11 @@ const createComment = async (
 };
 
 const resolveComment = async (id: string) => {
-  if (import.meta.env.PROD) return;
+  const apiPath = getApiPath();
+  if (import.meta.env.PROD && apiPath === API_PATH) return;
 
   try {
-    const response = await fetch(`${API_PATH}/${encodeURIComponent(id)}`, {
+    const response = await fetch(`${apiPath}/${encodeURIComponent(id)}`, {
       body: JSON.stringify({ status: "resolved" }),
       headers: { ...API_HEADERS, "content-type": "application/json" },
       method: "PATCH",

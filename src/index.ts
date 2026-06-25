@@ -1,11 +1,10 @@
-import fs from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { mergeConfig, type Plugin, type UserConfig } from "vite";
 import { isCanvasComment, readCanvasCommentStatus } from "./comment-schema.ts";
-import { API_PATH, STORAGE_RELATIVE_PATH } from "./constants.ts";
-import type { CanvasComment } from "./types.ts";
+import { API_PATH } from "./constants.ts";
+import { FsAdapter } from "./storage/fs-adapter.ts";
+import type { StorageAdapter } from "./storage/types.ts";
 
 const managerEntry = fileURLToPath(new URL("./manager.tsx", import.meta.url));
 const previewEntry = fileURLToPath(new URL("./preview.ts", import.meta.url));
@@ -20,29 +19,18 @@ export const previewAnnotations = (entries: string[] = []) => [
   previewEntry,
 ];
 
+export const env = (
+  existing: Record<string, string> = {},
+  options: { apiUrl?: string } = {},
+): Record<string, string> => ({
+  ...existing,
+  ...(options.apiUrl ? { CANVAS_COMMENTS_API_URL: options.apiUrl } : {}),
+});
+
 const json = (res: ServerResponse, statusCode: number, value: unknown) => {
   res.statusCode = statusCode;
   res.setHeader("content-type", "application/json");
   res.end(JSON.stringify(value));
-};
-
-const getCommentsFile = () => resolve(process.cwd(), STORAGE_RELATIVE_PATH);
-
-const readComments = async (): Promise<CanvasComment[]> => {
-  try {
-    const parsed = JSON.parse(await fs.readFile(getCommentsFile(), "utf8")) as
-      | unknown
-      | undefined;
-    return Array.isArray(parsed) ? parsed.filter(isCanvasComment) : [];
-  } catch {
-    return [];
-  }
-};
-
-const writeComments = async (comments: CanvasComment[]) => {
-  const file = getCommentsFile();
-  await fs.mkdir(dirname(file), { recursive: true });
-  await fs.writeFile(file, `${JSON.stringify(comments, null, 2)}\n`);
 };
 
 const readBody = async (req: IncomingMessage): Promise<unknown> => {
@@ -56,30 +44,33 @@ const readBody = async (req: IncomingMessage): Promise<unknown> => {
   return raw ? (JSON.parse(raw) as unknown) : undefined;
 };
 
-const handleDeleteRequest = async (res: ServerResponse, id: string) => {
+const handleDeleteRequest = async (
+  res: ServerResponse,
+  id: string,
+  adapter: StorageAdapter,
+) => {
   if (!id) {
     json(res, 400, { error: "Invalid canvas comment id" });
     return;
   }
 
-  const comments = await readComments();
-  const deleted = comments.find((comment) => comment.id === id);
+  const deleted = await adapter.remove(id);
 
   if (!deleted) {
     json(res, 404, { error: "Canvas comment not found" });
     return;
   }
 
-  await writeComments(comments.filter((comment) => comment.id !== id));
   json(res, 200, deleted);
 };
 
 const handleCollectionRequest = async (
   req: IncomingMessage,
   res: ServerResponse,
+  adapter: StorageAdapter,
 ) => {
   if (req.method === "GET") {
-    json(res, 200, await readComments());
+    json(res, 200, await adapter.list());
     return;
   }
 
@@ -95,18 +86,18 @@ const handleCollectionRequest = async (
     return;
   }
 
-  const comments = [body, ...(await readComments())];
-  await writeComments(comments);
-  json(res, 201, body);
+  const saved = await adapter.create(body);
+  json(res, 201, saved);
 };
 
 const handleItemRequest = async (
   req: IncomingMessage,
   res: ServerResponse,
   id: string,
+  adapter: StorageAdapter,
 ) => {
   if (req.method === "DELETE") {
-    await handleDeleteRequest(res, id);
+    await handleDeleteRequest(res, id, adapter);
     return;
   }
 
@@ -123,18 +114,13 @@ const handleItemRequest = async (
     return;
   }
 
-  const comments = await readComments();
-  const updatedComments = comments.map((comment) =>
-    comment.id === id ? { ...comment, status: nextStatus } : comment,
-  );
-  const updated = updatedComments.find((comment) => comment.id === id);
+  const updated = await adapter.updateStatus(id, nextStatus);
 
   if (!updated) {
     json(res, 404, { error: "Canvas comment not found" });
     return;
   }
 
-  await writeComments(updatedComments);
   json(res, 200, updated);
 };
 
@@ -142,9 +128,10 @@ const handleRequest = async (
   req: IncomingMessage,
   res: ServerResponse,
   pathname: string,
+  adapter: StorageAdapter,
 ) => {
   if (pathname === API_PATH) {
-    await handleCollectionRequest(req, res);
+    await handleCollectionRequest(req, res, adapter);
     return;
   }
 
@@ -155,6 +142,7 @@ const handleRequest = async (
       req,
       res,
       decodeURIComponent(pathname.slice(prefix.length)),
+      adapter,
     );
     return;
   }
@@ -162,31 +150,41 @@ const handleRequest = async (
   json(res, 404, { error: "Canvas comments endpoint not found" });
 };
 
-const canvasCommentsApi = (): Plugin => ({
-  configureServer(server) {
-    server.middlewares.use((req, res, next) => {
-      const pathname = new URL(req.url ?? "", "http://localhost").pathname;
+const canvasCommentsApi = (): Plugin => {
+  const adapter: StorageAdapter = new FsAdapter();
 
-      if (!pathname.startsWith(API_PATH)) {
-        next();
-        return;
-      }
+  return {
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const pathname = new URL(req.url ?? "", "http://localhost").pathname;
 
-      void (async () => {
-        try {
-          await handleRequest(req, res, pathname);
-        } catch (error: unknown) {
-          const message =
-            error instanceof Error ? error.message : "Unknown server error";
-          json(res, 500, { error: message });
+        if (!pathname.startsWith(API_PATH)) {
+          next();
+          return;
         }
-      })();
-    });
-  },
-  name: "storybook-addon-canvas-comments-api",
-});
 
-export const viteFinal = async (config: UserConfig): Promise<UserConfig> =>
+        void (async () => {
+          try {
+            await handleRequest(req, res, pathname, adapter);
+          } catch (error: unknown) {
+            const message =
+              error instanceof Error ? error.message : "Unknown server error";
+            json(res, 500, { error: message });
+          }
+        })();
+      });
+    },
+    name: "storybook-addon-canvas-comments-api",
+  };
+};
+
+export const viteFinal = async (
+  config: UserConfig,
+  options: { apiUrl?: string } = {},
+): Promise<UserConfig> =>
   mergeConfig(config, {
+    define: {
+      __CANVAS_COMMENTS_API_URL__: JSON.stringify(options.apiUrl ?? ""),
+    },
     plugins: [canvasCommentsApi()],
   });

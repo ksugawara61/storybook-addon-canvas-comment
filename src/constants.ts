@@ -15,3 +15,20 @@ export const EVENTS = {
   DELETED: `${ADDON_ID}/deleted`,
   UPDATED: `${ADDON_ID}/updated`,
 };
+
+declare const __CANVAS_COMMENTS_API_URL__: string | undefined;
+
+export const getApiPath = (): string => {
+  // preview iframe: injected via viteFinal define at build time
+  if (
+    typeof __CANVAS_COMMENTS_API_URL__ !== "undefined" &&
+    __CANVAS_COMMENTS_API_URL__
+  ) {
+    return __CANVAS_COMMENTS_API_URL__;
+  }
+  // manager frame: injected via env preset hook as process.env.*
+  if (typeof process !== "undefined" && process.env.CANVAS_COMMENTS_API_URL) {
+    return process.env.CANVAS_COMMENTS_API_URL;
+  }
+  return API_PATH;
+};
