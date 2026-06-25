@@ -7,7 +7,12 @@ import {
 // biome-ignore lint/correctness/noUnusedImports: Storybook manager bundles this TSX with the classic JSX runtime.
 import React, { useCallback, useEffect, useState } from "react";
 import { AddonPanel, ToggleButton } from "storybook/internal/components";
-import { addons, types, useGlobals } from "storybook/manager-api";
+import {
+  addons,
+  types,
+  useGlobals,
+  useStorybookApi,
+} from "storybook/manager-api";
 import {
   ADDON_ID,
   API_HEADERS,
@@ -118,6 +123,16 @@ const styles = {
     padding: "2px 8px",
     textTransform: "uppercase",
   },
+  storyLink: {
+    background: "transparent",
+    border: "none",
+    color: "inherit",
+    cursor: "pointer",
+    font: "inherit",
+    fontWeight: 700,
+    padding: 0,
+    textDecoration: "underline",
+  },
   storyTitle: {
     color: "inherit",
     fontSize: 12,
@@ -183,6 +198,7 @@ const OverlayTool = () => {
 };
 
 const Panel = () => {
+  const api = useStorybookApi();
   const [globals, updateGlobals] = useGlobals();
   const [items, setItems] = useState<CanvasComment[]>([]);
   const [error, setError] = useState<string | undefined>();
@@ -336,7 +352,13 @@ const Panel = () => {
         items.map((item) => (
           <article key={item.id} style={styles.item}>
             <div style={styles.itemHeader}>
-              <strong>{item.storyName}</strong>
+              <button
+                onClick={() => api.selectStory(item.storyId)}
+                style={styles.storyLink}
+                type="button"
+              >
+                {item.storyName}
+              </button>
               <span style={statusStyle(item.status)}>{item.status}</span>
             </div>
             <div style={styles.storyTitle}>{item.storyTitle}</div>
