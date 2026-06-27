@@ -51,6 +51,46 @@ toolbar の目アイコン、または panel header の “Pins” checkbox で�
 
 このリポジトリでは local feedback data として `**/.storybook/canvas-comments/comments.json` を ignore しています。AI エージェントに読ませる場合は、作業中の workspace にあるこの JSON を直接参照します。
 
+## レビュー完了の検知（コーディングエージェント連携）
+
+UI 変更後に Storybook を起動したコーディングエージェントが、ユーザーのレビュー完了を
+検知して後続作業（修正・Issue 化など）へ進めるための仕組みです。
+
+1. ユーザーが canvas にコメントを残します。
+2. 書き終えたら panel header の **「レビュー完了」ボタン**をクリックします。
+3. これによりレビュー状態が `completed` になり、待機中のエージェントに合図が伝わります。
+
+新規コメントを追加すると状態は自動的に `reviewing` へ戻るため、修正 → 再レビューの
+反復にも対応します。
+
+レビュー状態は dev server の実行ディレクトリ配下に保存されます。
+
+```text
+.storybook/canvas-comments/review-status.json
+```
+
+```json
+{
+  "status": "reviewing",
+  "updatedAt": "2026-06-27T00:00:00.000Z"
+}
+```
+
+エージェント側は `wait-comments` CLI でレビュー完了をブロッキング待機できます。
+完了を検知すると open コメントの dom-map JSON を stdout に出力して終了します。
+
+```bash
+pnpm --filter storybook-addon-canvas-comments wait-comments -- \
+  --comments-file ../../apps/curio/mobile/.storybook/canvas-comments/comments.json \
+  --review-status-file ../../apps/curio/mobile/.storybook/canvas-comments/review-status.json \
+  --include-dom-tree
+```
+
+CLI は起動時にレビュー状態を `reviewing` へリセットしてからポーリングします（直前の
+`completed` で即時 return しないため）。リセットしたくない場合は `--no-reset` を付けます。
+`--timeout-ms` で待機の上限（超過時 exit 1）、`--poll-interval-ms` でポーリング間隔を
+指定できます。`--status` / `--story-id` で出力対象コメントを絞り込めます。
+
 ## API
 
 Vite builder では addon preset が middleware を追加します。
@@ -60,6 +100,8 @@ GET   /__canvas-comments/comments
 POST  /__canvas-comments/comments
 PATCH /__canvas-comments/comments/:id
 DELETE /__canvas-comments/comments/:id
+GET   /__canvas-comments/review
+POST  /__canvas-comments/review
 ```
 
 `PATCH` は `status` を `open` / `resolved` に更新します。
@@ -71,6 +113,15 @@ DELETE /__canvas-comments/comments/:id
 ```
 
 `DELETE` は対象コメントを `comments.json` から削除し、削除したコメントを返します。
+
+`/__canvas-comments/review` の `GET` は現在のレビュー状態を返し、`POST` は `status` を
+`reviewing` / `completed` に更新します。
+
+```json
+{
+  "status": "completed"
+}
+```
 
 addon の保存 API への fetch は `Accept: msw/passthrough` を付けて送信します。`msw-storybook-addon` を使っている story でも、`POST /__canvas-comments/comments` が unhandled request warning にならず、Storybook dev server の middleware へそのまま届きます。
 

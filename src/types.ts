@@ -1,5 +1,12 @@
 export type CanvasCommentStatus = "open" | "resolved";
 
+export type ReviewStatus = "reviewing" | "completed";
+
+export type ReviewState = {
+  status: ReviewStatus;
+  updatedAt: string | null;
+};
+
 export type CanvasCommentRect = {
   x: number;
   y: number;

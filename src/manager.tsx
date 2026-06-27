@@ -19,12 +19,18 @@ import {
   COMMENTS_VISIBLE_PARAM_KEY,
   EVENTS,
   getApiPath,
+  getReviewApiPath,
   OVERLAY_TOOL_ID,
   PANEL_ID,
   PARAM_KEY,
   TOOL_ID,
 } from "./constants";
-import type { CanvasComment, CanvasCommentStatus } from "./types";
+import type {
+  CanvasComment,
+  CanvasCommentStatus,
+  ReviewState,
+  ReviewStatus,
+} from "./types";
 
 const styles = {
   actions: {
@@ -165,6 +171,15 @@ const statusStyle = (status: CanvasCommentStatus) => ({
   color: status === "open" ? "#6f4e00" : "#166534",
 });
 
+const reviewStatusStyle = (status: ReviewStatus) => ({
+  ...styles.status,
+  background: status === "completed" ? "#e5f7ed" : "#e7eefc",
+  color: status === "completed" ? "#166534" : "#1d4ed8",
+});
+
+const reviewStatusLabel = (status: ReviewStatus) =>
+  status === "completed" ? "レビュー完了" : "レビュー中";
+
 const Tool = () => {
   const [globals, updateGlobals] = useGlobals();
   const active = globals[PARAM_KEY] === true;
@@ -202,7 +217,55 @@ const Panel = () => {
   const [globals, updateGlobals] = useGlobals();
   const [items, setItems] = useState<CanvasComment[]>([]);
   const [error, setError] = useState<string | undefined>();
+  const [reviewStatus, setReviewStatus] = useState<ReviewStatus>("reviewing");
   const pinsVisible = globals[COMMENTS_VISIBLE_PARAM_KEY] !== false;
+
+  const loadReview = useCallback(async () => {
+    try {
+      const response = await fetch(getReviewApiPath(), {
+        headers: API_HEADERS,
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      // 静的ビルド (Cloudflare Pages SPA fallback) では HTML が返るため JSON でないならスキップ。
+      const contentType = response.headers.get("content-type") ?? "";
+      if (!contentType.includes("application/json")) {
+        return;
+      }
+
+      const state = (await response.json()) as ReviewState;
+      setReviewStatus(state.status);
+    } catch {
+      // dev server 以外（静的ビルド等）では review API が無いため黙ってスキップ。
+    }
+  }, []);
+
+  const completeReview = useCallback(async () => {
+    try {
+      const response = await fetch(getReviewApiPath(), {
+        body: JSON.stringify({ status: "completed" }),
+        headers: { ...API_HEADERS, "content-type": "application/json" },
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to complete review: ${response.status}`);
+      }
+
+      const state = (await response.json()) as ReviewState;
+      setReviewStatus(state.status);
+      setError(undefined);
+    } catch (completeError) {
+      setError(
+        completeError instanceof Error
+          ? completeError.message
+          : "Failed to complete review",
+      );
+    }
+  }, []);
 
   const loadComments = useCallback(async () => {
     try {
@@ -298,10 +361,13 @@ const Panel = () => {
 
   useEffect(() => {
     void loadComments();
+    void loadReview();
 
     const channel = addons.getChannel();
     const onCreated = (item: CanvasComment) => {
       setItems((prev) => [item, ...prev.filter((next) => next.id !== item.id)]);
+      // 新規コメントで server 側が reviewing に再アームするため UI も追従する。
+      setReviewStatus("reviewing");
     };
     const onUpdated = (item: CanvasComment) => {
       setItems((prev) =>
@@ -320,13 +386,16 @@ const Panel = () => {
       channel.off(EVENTS.DELETED, onDeleted);
       channel.off(EVENTS.UPDATED, onUpdated);
     };
-  }, [loadComments]);
+  }, [loadComments, loadReview]);
 
   return (
     <div style={styles.root}>
       <header style={styles.header}>
         <strong>UI Feedback</strong>
         <div style={styles.headerActions}>
+          <span style={reviewStatusStyle(reviewStatus)}>
+            {reviewStatusLabel(reviewStatus)}
+          </span>
           <label style={styles.toggleLabel}>
             <input
               checked={pinsVisible}
@@ -338,7 +407,19 @@ const Panel = () => {
             Pins
           </label>
           <button
-            onClick={() => void loadComments()}
+            disabled={reviewStatus === "completed"}
+            onClick={() => void completeReview()}
+            style={styles.button}
+            title="レビューを完了し、待機中のコーディングエージェントに合図します"
+            type="button"
+          >
+            レビュー完了
+          </button>
+          <button
+            onClick={() => {
+              void loadComments();
+              void loadReview();
+            }}
             style={styles.button}
             type="button"
           >

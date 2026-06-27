@@ -2,8 +2,10 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { fileURLToPath } from "node:url";
 import { mergeConfig, type Plugin, type UserConfig } from "vite";
 import { isCanvasComment, readCanvasCommentStatus } from "./comment-schema.ts";
-import { API_PATH } from "./constants.ts";
+import { API_PATH, BASE_API_PATH, REVIEW_API_PATH } from "./constants.ts";
+import { readReviewStatus } from "./review-schema.ts";
 import { FsAdapter } from "./storage/fs-adapter.ts";
+import { FsReviewStore } from "./storage/review-store.ts";
 import type { StorageAdapter } from "./storage/types.ts";
 
 const managerEntry = fileURLToPath(new URL("./manager.tsx", import.meta.url));
@@ -68,6 +70,7 @@ const handleCollectionRequest = async (
   req: IncomingMessage,
   res: ServerResponse,
   adapter: StorageAdapter,
+  reviewStore: FsReviewStore,
 ) => {
   if (req.method === "GET") {
     json(res, 200, await adapter.list());
@@ -87,7 +90,35 @@ const handleCollectionRequest = async (
   }
 
   const saved = await adapter.create(body);
+  // 新規コメント追加でレビュー状態を reviewing に再アームし、反復レビューに対応する。
+  await reviewStore.write("reviewing");
   json(res, 201, saved);
+};
+
+const handleReviewRequest = async (
+  req: IncomingMessage,
+  res: ServerResponse,
+  reviewStore: FsReviewStore,
+) => {
+  if (req.method === "GET") {
+    json(res, 200, await reviewStore.read());
+    return;
+  }
+
+  if (req.method !== "POST") {
+    json(res, 405, { error: "Method not allowed" });
+    return;
+  }
+
+  const body = await readBody(req);
+  const nextStatus = readReviewStatus(body);
+
+  if (!nextStatus) {
+    json(res, 400, { error: "Invalid review status payload" });
+    return;
+  }
+
+  json(res, 200, await reviewStore.write(nextStatus));
 };
 
 const handleItemRequest = async (
@@ -129,9 +160,15 @@ const handleRequest = async (
   res: ServerResponse,
   pathname: string,
   adapter: StorageAdapter,
+  reviewStore: FsReviewStore,
 ) => {
+  if (pathname === REVIEW_API_PATH) {
+    await handleReviewRequest(req, res, reviewStore);
+    return;
+  }
+
   if (pathname === API_PATH) {
-    await handleCollectionRequest(req, res, adapter);
+    await handleCollectionRequest(req, res, adapter, reviewStore);
     return;
   }
 
@@ -152,20 +189,21 @@ const handleRequest = async (
 
 const canvasCommentsApi = (): Plugin => {
   const adapter: StorageAdapter = new FsAdapter();
+  const reviewStore = new FsReviewStore();
 
   return {
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const pathname = new URL(req.url ?? "", "http://localhost").pathname;
 
-        if (!pathname.startsWith(API_PATH)) {
+        if (!pathname.startsWith(BASE_API_PATH)) {
           next();
           return;
         }
 
         void (async () => {
           try {
-            await handleRequest(req, res, pathname, adapter);
+            await handleRequest(req, res, pathname, adapter, reviewStore);
           } catch (error: unknown) {
             const message =
               error instanceof Error ? error.message : "Unknown server error";

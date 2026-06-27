@@ -4,11 +4,15 @@ export const OVERLAY_TOOL_ID = `${ADDON_ID}/overlay-tool`;
 export const PANEL_ID = `${ADDON_ID}/panel`;
 export const PARAM_KEY = "canvasCommentsEnabled";
 export const COMMENTS_VISIBLE_PARAM_KEY = "canvasCommentsVisible";
-export const API_PATH = "/__canvas-comments/comments";
+export const BASE_API_PATH = "/__canvas-comments";
+export const API_PATH = `${BASE_API_PATH}/comments`;
+export const REVIEW_API_PATH = `${BASE_API_PATH}/review`;
 export const API_HEADERS = {
   accept: "application/json, msw/passthrough",
 };
 export const STORAGE_RELATIVE_PATH = ".storybook/canvas-comments/comments.json";
+export const REVIEW_STORAGE_RELATIVE_PATH =
+  ".storybook/canvas-comments/review-status.json";
 
 export const EVENTS = {
   CREATED: `${ADDON_ID}/created`,
@@ -32,3 +36,8 @@ export const getApiPath = (): string => {
   }
   return API_PATH;
 };
+
+// レビュー状態 API のパス。getApiPath() の comments エンドポイントを基準に、
+// 末尾 /comments を /review へ置換して env override / dev 既定の両方に追従する。
+export const getReviewApiPath = (): string =>
+  getApiPath().replace(/\/comments$/, "/review");

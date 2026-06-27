@@ -29,7 +29,8 @@
   "scripts": {
     "dom-map": "tsx src/cli/dom-map.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "wait-comments": "tsx src/cli/wait-comments.ts"
   },
   "type": "module",
   "version": "0.1.0"
