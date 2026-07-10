@@ -1,13 +1,28 @@
 # storybook-addon-canvas-comments
 
-Storybook Canvas 上で UI 修正用のインラインコメントを残すための addon です。
+A Storybook addon for leaving inline UI feedback comments directly on the canvas — designed so that coding agents (AI assistants) can pick up the feedback and act on it.
+
+Click any element in a story, type a note, and the comment is saved together with a CSS selector, pointer coordinates, and a DOM snapshot of the target element. A companion CLI lets an agent block until you finish reviewing, then receive all open comments as structured JSON.
+
+## Features
+
+- **Inline commenting** — toggle "UI Feedback" in the toolbar, click an element on the canvas, and type a note in the popover.
+- **Comment pins** — saved comments are shown as pins on the canvas. Hover or focus a pin to read the note and resolve it in place. Toggle pin visibility from the toolbar (eye icon) or the panel header.
+- **Addon panel** — a "UI Feedback" panel lists all comments with their selector and metadata, and supports reopen / resolve / delete.
+- **Review-completion signal** — a "Complete review" button in the panel flips a review status flag that a waiting coding agent can detect.
+- **Agent-friendly output** — the `dom-map` and `wait-comments` CLIs map each comment to the live DOM and emit JSON built for LLM consumption.
+
+## Requirements
+
+- Storybook with the **Vite builder** (the addon preset registers a Vite dev-server middleware via `viteFinal`). Webpack builders are not supported.
+- React-based manager UI (standard Storybook 8+).
 
 ## Setup
 
-workspace package として登録している場合は `.storybook/main.ts` の `addons` に追加します。
+Register the addon in `.storybook/main.ts`:
 
 ```ts
-import type { StorybookConfig } from "@storybook/react-native-web-vite";
+import type { StorybookConfig } from "@storybook/react-vite";
 
 const config: StorybookConfig = {
   addons: ["storybook-addon-canvas-comments"],
@@ -16,15 +31,15 @@ const config: StorybookConfig = {
 export default config;
 ```
 
-このリポジトリ内で source package を直接参照する場合は、既存の各 Storybook と同じように `resolve(import.meta.dirname, "...")` で addon preset entry を渡します。
+When consuming the package as workspace source inside a monorepo, pass the addon preset entry by path instead:
 
 ```ts
 import { resolve } from "node:path";
-import type { StorybookConfig } from "@storybook/react-native-web-vite";
+import type { StorybookConfig } from "@storybook/react-vite";
 
 const canvasCommentsAddon = resolve(
   import.meta.dirname,
-  "../../../../packages/storybook-addon-canvas-comments/src/index.ts",
+  "../../packages/storybook-addon-canvas-comments/src/index.ts",
 );
 
 const config: StorybookConfig = {
@@ -36,34 +51,32 @@ export default config;
 
 ## Usage
 
-1. Storybook の toolbar に表示される “UI Feedback” を ON にします。
-2. Canvas 上の対象 UI をクリックします。
-3. prompt にコメントを入力します。
-4. addon panel の “UI Feedback” にコメントが表示されます。
+1. Turn on **UI Feedback** in the Storybook toolbar.
+2. Click the target UI element on the canvas.
+3. Type your note in the popover (`Cmd/Ctrl+Enter` to save, `Escape` to cancel).
+4. The comment appears in the **UI Feedback** addon panel.
 
-toolbar の目アイコン、または panel header の “Pins” checkbox で、保存済みコメントの canvas 上 pin 表示を ON/OFF できます。pin に hover / focus するとコメント本文を tooltip として表示します。
+Use the eye icon in the toolbar, or the **Pins** checkbox in the panel header, to show or hide the saved-comment pins on the canvas. Hovering or focusing a pin shows the note as a tooltip with a resolve button.
 
-コメントは Storybook dev server の実行ディレクトリ配下に保存されます。
+Comments are stored under the directory where the Storybook dev server runs:
 
 ```text
 .storybook/canvas-comments/comments.json
 ```
 
-このリポジトリでは local feedback data として `**/.storybook/canvas-comments/comments.json` を ignore しています。AI エージェントに読ませる場合は、作業中の workspace にあるこの JSON を直接参照します。
+Treat this file as local feedback data (add it to `.gitignore`). A coding agent can read the JSON directly, or use the CLIs below for DOM-mapped output.
 
-## レビュー完了の検知（コーディングエージェント連携）
+## Review completion (coding-agent integration)
 
-UI 変更後に Storybook を起動したコーディングエージェントが、ユーザーのレビュー完了を
-検知して後続作業（修正・Issue 化など）へ進めるための仕組みです。
+This workflow lets a coding agent that started Storybook detect when your review is finished, then move on to follow-up work (fixes, filing issues, and so on).
 
-1. ユーザーが canvas にコメントを残します。
-2. 書き終えたら panel header の **「レビュー完了」ボタン**をクリックします。
-3. これによりレビュー状態が `completed` になり、待機中のエージェントに合図が伝わります。
+1. Leave comments on the canvas.
+2. When you are done, click the **Complete review** button (labeled "レビュー完了") in the panel header.
+3. The review status becomes `completed`, signaling any waiting agent.
 
-新規コメントを追加すると状態は自動的に `reviewing` へ戻るため、修正 → 再レビューの
-反復にも対応します。
+Adding a new comment automatically flips the status back to `reviewing`, so the fix → re-review loop works repeatedly.
 
-レビュー状態は dev server の実行ディレクトリ配下に保存されます。
+The review status is stored next to the comments:
 
 ```text
 .storybook/canvas-comments/review-status.json
@@ -76,35 +89,35 @@ UI 変更後に Storybook を起動したコーディングエージェントが
 }
 ```
 
-エージェント側は `wait-comments` CLI でレビュー完了をブロッキング待機できます。
-完了を検知すると open コメントの dom-map JSON を stdout に出力して終了します。
+An agent can block until the review completes with the `wait-comments` CLI. On completion it prints the dom-map JSON of the open comments to stdout and exits:
 
 ```bash
 pnpm --filter storybook-addon-canvas-comments wait-comments -- \
-  --comments-file ../../apps/curio/mobile/.storybook/canvas-comments/comments.json \
-  --review-status-file ../../apps/curio/mobile/.storybook/canvas-comments/review-status.json \
+  --comments-file path/to/.storybook/canvas-comments/comments.json \
+  --review-status-file path/to/.storybook/canvas-comments/review-status.json \
   --include-dom-tree
 ```
 
-CLI は起動時にレビュー状態を `reviewing` へリセットしてからポーリングします（直前の
-`completed` で即時 return しないため）。リセットしたくない場合は `--no-reset` を付けます。
-`--timeout-ms` で待機の上限（超過時 exit 1）、`--poll-interval-ms` でポーリング間隔を
-指定できます。`--status` / `--story-id` で出力対象コメントを絞り込めます。
+On startup the CLI resets the review status to `reviewing` before polling, so a stale `completed` from a previous round does not return immediately. Pass `--no-reset` to skip the reset. Other options:
 
-## API
+- `--timeout-ms <ms>` — give up after this long (exit code 1); `0` waits indefinitely (default).
+- `--poll-interval-ms <ms>` — polling interval (default `2000`).
+- `--status <open|resolved|all>` / `--story-id <id>` — filter which comments are included in the output.
 
-Vite builder では addon preset が middleware を追加します。
+## HTTP API
+
+With the Vite builder, the addon preset adds a middleware to the Storybook dev server:
 
 ```text
-GET   /__canvas-comments/comments
-POST  /__canvas-comments/comments
-PATCH /__canvas-comments/comments/:id
+GET    /__canvas-comments/comments
+POST   /__canvas-comments/comments
+PATCH  /__canvas-comments/comments/:id
 DELETE /__canvas-comments/comments/:id
-GET   /__canvas-comments/review
-POST  /__canvas-comments/review
+GET    /__canvas-comments/review
+POST   /__canvas-comments/review
 ```
 
-`PATCH` は `status` を `open` / `resolved` に更新します。
+`PATCH` updates a comment's `status` to `open` or `resolved`:
 
 ```json
 {
@@ -112,10 +125,9 @@ POST  /__canvas-comments/review
 }
 ```
 
-`DELETE` は対象コメントを `comments.json` から削除し、削除したコメントを返します。
+`DELETE` removes the comment from `comments.json` and returns the deleted comment.
 
-`/__canvas-comments/review` の `GET` は現在のレビュー状態を返し、`POST` は `status` を
-`reviewing` / `completed` に更新します。
+`GET /__canvas-comments/review` returns the current review state; `POST` sets `status` to `reviewing` or `completed`:
 
 ```json
 {
@@ -123,19 +135,19 @@ POST  /__canvas-comments/review
 }
 ```
 
-addon の保存 API への fetch は `Accept: msw/passthrough` を付けて送信します。`msw-storybook-addon` を使っている story でも、`POST /__canvas-comments/comments` が unhandled request warning にならず、Storybook dev server の middleware へそのまま届きます。
+Requests from the addon are sent with `Accept: msw/passthrough`, so stories using `msw-storybook-addon` do not log unhandled-request warnings — the requests pass straight through to the dev-server middleware.
 
-## CLI
+## `dom-map` CLI
 
-Storybook dev server が起動している状態で、保存済みコメントと canvas 内の実 DOM を対応付けた JSON を出力できます。
+While the Storybook dev server is running, you can emit JSON that maps each saved comment to the actual DOM inside the canvas:
 
 ```bash
 pnpm --filter storybook-addon-canvas-comments dom-map -- \
   --storybook-url http://localhost:6006 \
-  --story-id features-bookmark-list--success
+  --story-id example-button--primary
 ```
 
-`--story-id` を省略すると、コメントがある story をすべて処理します。既定では `open` コメントのみを対象にします。
+Omitting `--story-id` processes every story that has comments. Only `open` comments are included by default.
 
 ```bash
 pnpm --filter storybook-addon-canvas-comments dom-map -- \
@@ -145,31 +157,31 @@ pnpm --filter storybook-addon-canvas-comments dom-map -- \
   --include-dom-tree
 ```
 
-CLI は次の順でコメント対象を解決します。
+The CLI resolves each comment's target in this order:
 
-1. 保存済み `selector` を `document.querySelector` で解決
-2. 解決できない場合、保存時 viewport から現在 viewport に pointer を scale し、`document.elementsFromPoint` で fallback
+1. Resolve the stored `selector` with `document.querySelector`.
+2. If that fails, scale the stored pointer from the original viewport to the current one and fall back to `document.elementsFromPoint`.
 
-出力には comment の保存座標、現在座標、対応 DOM 要素の tag / attributes / rect / text / ancestor 情報が含まれます。`--include-dom-tree` を付けると bounded DOM tree も含めます。snapshot エンジンでは **コメント対象要素を起点とした subtree** のみを保持するため AI エージェントのコンテキスト消費を抑えられます。playwright エンジンでは従来どおり `#storybook-root` 配下の subtree になります。
+The output includes the stored coordinates, current coordinates, and the matched element's tag / attributes / rect / text / ancestors. With `--include-dom-tree` a bounded DOM tree is also included. The `snapshot` engine keeps only the **subtree rooted at each comment target**, which keeps the context small for AI agents; the `playwright` engine emits the subtree under `#storybook-root`.
 
-DOM 取得前には `role="progressbar"`、`loading` / `spinner` / `skeleton` 系の属性、`読み込み中` / `Loading` テキストが消えるまで待機します。Loading 状態そのものの story を調べる場合は `--skip-loading-wait` を指定します。
+Before capturing the DOM, the CLI waits until loading indicators disappear — elements matching `role="progressbar"`, `loading` / `spinner` / `skeleton` class or test-id patterns, and "Loading" text. Pass `--skip-loading-wait` when inspecting a loading-state story itself.
 
-## JSON Schema
+## JSON schema
 
-AI エージェントが読む前提で、コメントは配列として保存されます。
+Comments are stored as a JSON array, designed to be read by AI agents:
 
 ```json
 [
   {
     "id": "42f3dcbf-4e8d-49e4-86c4-7a61a62b7e70",
-    "storyId": "features-bookmark-list--success",
-    "storyTitle": "features/bookmark-list",
-    "storyName": "Success",
-    "note": "ボタンの余白を少し広げたい",
-    "selector": "[data-ai-source=\"apps/curio/mobile/src/features/bookmark-list/index.tsx:42\"]",
-    "dataTestId": "bookmark-submit",
-    "dataAiComponent": "BookmarkSubmitButton",
-    "dataAiSource": "apps/curio/mobile/src/features/bookmark-list/index.tsx:42",
+    "storyId": "example-button--primary",
+    "storyTitle": "Example/Button",
+    "storyName": "Primary",
+    "note": "Increase the padding around this button",
+    "selector": "[data-ai-source=\"src/components/Button.tsx:42\"]",
+    "dataTestId": "submit-button",
+    "dataAiComponent": "SubmitButton",
+    "dataAiSource": "src/components/Button.tsx:42",
     "rect": {
       "x": 24,
       "y": 120,
@@ -190,9 +202,38 @@ AI エージェントが読む前提で、コメントは配列として保存�
 ]
 ```
 
-`selector` は次の優先順位で作ります。
+Each comment may also carry a `domContext` object — a snapshot of the target element and a bounded DOM tree captured at comment time.
 
-1. `data-ai-source`
-2. `data-testid`
-3. `id`
-4. tag / class / path の簡易 selector
+### Selector strategy
+
+The stored `selector` is built with this priority:
+
+1. `[data-ai-source="…"]` — a source-location attribute, if your build emits one
+2. `[data-testid="…"]`
+3. `#id`
+4. a short tag / class / `nth-of-type` path selector
+
+The clicked element is first widened to the closest ancestor carrying one of those attributes, so comments attach to meaningful components rather than leaf nodes.
+
+## Hosted mode (Cloudflare Pages + Turso)
+
+By default comments are stored on the local filesystem via the dev-server middleware. For a statically built Storybook deployed to Cloudflare Pages, the `src/cloudflare/` directory provides Pages Functions that store comments in a Turso (libSQL) database instead:
+
+- `src/cloudflare/functions/api/canvas-comments/` — Pages Functions implementing `GET/POST /api/canvas-comments` and `PATCH/DELETE /api/canvas-comments/:id`
+- `src/cloudflare/schema.sql` — the `canvas_comments` table definition
+- `src/cloudflare/wrangler.example.toml` — example Pages configuration; set `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` as environment variables
+
+Point the addon at the hosted API via the preset options:
+
+```ts
+const config: StorybookConfig = {
+  addons: [
+    {
+      name: "storybook-addon-canvas-comments",
+      options: { apiUrl: "/api/canvas-comments" },
+    },
+  ],
+};
+```
+
+Note: the hosted functions currently implement the comments API only — the review-status API (`/review`) is filesystem-based and not available in hosted mode, so the `wait-comments` flow requires a local dev server.
