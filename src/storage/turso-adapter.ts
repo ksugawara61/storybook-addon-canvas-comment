@@ -1,5 +1,10 @@
 import type { Client } from "@libsql/client";
-import type { CanvasComment, CanvasCommentStatus } from "../types.ts";
+import type {
+  CanvasComment,
+  CanvasCommentStatus,
+  ReviewState,
+  ReviewStatus,
+} from "../types.ts";
 import type { StorageAdapter } from "./types.ts";
 
 type Row = {
@@ -18,6 +23,11 @@ type Row = {
   created_at: string;
   status: string;
   dom_context: string | null;
+};
+
+type ReviewStateRow = {
+  status: string;
+  updated_at: string | null;
 };
 
 const rowToComment = (row: Row): CanvasComment => ({
@@ -110,5 +120,33 @@ export class TursoAdapter implements StorageAdapter {
       sql: "DELETE FROM canvas_comments WHERE id = ?",
     });
     return rowToComment(row as unknown as Row);
+  }
+
+  async readReviewState(): Promise<ReviewState> {
+    const result = await this.#client.execute(
+      "SELECT status, updated_at FROM review_state WHERE id = 1",
+    );
+    const row = result.rows[0] as unknown as ReviewStateRow | undefined;
+
+    if (!row) {
+      return { status: "reviewing", updatedAt: null };
+    }
+
+    return {
+      status: row.status as ReviewStatus,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  async writeReviewState(status: ReviewStatus): Promise<ReviewState> {
+    const updatedAt = new Date().toISOString();
+    await this.#client.execute({
+      args: [status, updatedAt],
+      sql: `INSERT INTO review_state (id, status, updated_at)
+        VALUES (1, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET status = excluded.status,
+          updated_at = excluded.updated_at`,
+    });
+    return { status, updatedAt };
   }
 }

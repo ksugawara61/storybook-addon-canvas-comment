@@ -1,7 +1,13 @@
 {
+  "author": "canvas-comments contributors",
+  "bin": {
+    "canvas-comments-dom-map": "./dist/cli/dom-map.js",
+    "canvas-comments-wait-comments": "./dist/cli/wait-comments.js"
+  },
   "dependencies": {
     "@libsql/client": "catalog:"
   },
+  "description": "Storybook addon for inline UI feedback on the canvas — click to annotate, review in a panel, and hand structured context to coding agents via a filesystem dom-map.",
   "devDependencies": {
     "@playwright/test": "catalog:",
     "@storybook/icons": "catalog:",
@@ -9,29 +15,73 @@
     "@types/react": "catalog:",
     "react": "catalog:",
     "storybook": "catalog:",
+    "tsup": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
   },
+  "engines": {
+    "node": ">=20"
+  },
   "exports": {
-    ".": "./src/index.ts",
-    "./manager": "./src/manager.tsx",
-    "./preview": "./src/preview.ts"
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./manager": {
+      "import": "./dist/manager.js",
+      "types": "./dist/manager.d.ts"
+    },
+    "./preview": {
+      "import": "./dist/preview.js",
+      "types": "./dist/preview.d.ts"
+    }
   },
   "files": [
-    "src",
-    "README.md"
+    "CHANGELOG.md",
+    "LICENSE",
+    "dist",
+    "README.md",
+    "src/cloudflare"
   ],
-  "main": "./src/index.ts",
+  "keywords": [
+    "storybook-addon",
+    "canvas",
+    "ui-feedback",
+    "ai-agent",
+    "design-review",
+    "dom-map"
+  ],
+  "license": "MIT",
+  "main": "./dist/index.js",
   "name": "storybook-addon-canvas-comments",
-  "private": true,
+  "peerDependencies": {
+    "@playwright/test": ">=1.40.0",
+    "react": ">=18",
+    "storybook": ">=8",
+    "vite": ">=5"
+  },
+  "peerDependenciesMeta": {
+    "@playwright/test": {
+      "optional": true
+    }
+  },
   "scripts": {
+    "build": "tsup",
     "dom-map": "tsx src/cli/dom-map.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "wait-comments": "tsx src/cli/wait-comments.ts"
   },
+  "storybook": {
+    "displayName": "Canvas Comments",
+    "icon": "https://raw.githubusercontent.com/storybookjs/storybook/main/code/addons/comment.svg",
+    "supportedFrameworks": [
+      "react"
+    ]
+  },
   "type": "module",
+  "types": "./dist/index.d.ts",
   "version": "0.1.0"
 }

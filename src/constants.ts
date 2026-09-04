@@ -37,7 +37,7 @@ export const getApiPath = (): string => {
   return API_PATH;
 };
 
-// レビュー状態 API のパス。getApiPath() の comments エンドポイントを基準に、
-// 末尾 /comments を /review へ置換して env override / dev 既定の両方に追従する。
+// Path of the review status API. Derived from getApiPath()'s comments endpoint,
+// replacing the trailing /comments with /review so env overrides and the dev default both work.
 export const getReviewApiPath = (): string =>
   getApiPath().replace(/\/comments$/, "/review");

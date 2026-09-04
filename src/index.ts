@@ -90,7 +90,7 @@ const handleCollectionRequest = async (
   }
 
   const saved = await adapter.create(body);
-  // 新規コメント追加でレビュー状態を reviewing に再アームし、反復レビューに対応する。
+  // A new comment re-arms the review status to reviewing for iterative review rounds.
   await reviewStore.write("reviewing");
   json(res, 201, saved);
 };
@@ -226,3 +226,6 @@ export const viteFinal = async (
     },
     plugins: [canvasCommentsApi()],
   });
+
+export type { CanvasCommentsPluginOptions } from "./vite-plugin.ts";
+export { canvasCommentsPlugin } from "./vite-plugin.ts";

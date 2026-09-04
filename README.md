@@ -4,6 +4,17 @@ A Storybook addon for leaving inline UI feedback comments directly on the canvas
 
 Click any element in a story, type a note, and the comment is saved together with a CSS selector, pointer coordinates, and a DOM snapshot of the target element. A companion CLI lets an agent block until you finish reviewing, then receive all open comments as structured JSON.
 
+## Demo
+
+> Screenshots and GIF demos will be added after the English UI is finalized.
+
+<!-- TODO: Add screenshots showing:
+1. Toolbar toggle → canvas click → comment input popover
+2. Comment pins displayed on the canvas
+3. Addon panel with comment list
+4. Review completion button flow
+-->
+
 ## Features
 
 - **Inline commenting** — toggle "UI Feedback" in the toolbar, click an element on the canvas, and type a note in the popover.
@@ -71,7 +82,7 @@ Treat this file as local feedback data (add it to `.gitignore`). A coding agent 
 This workflow lets a coding agent that started Storybook detect when your review is finished, then move on to follow-up work (fixes, filing issues, and so on).
 
 1. Leave comments on the canvas.
-2. When you are done, click the **Complete review** button (labeled "レビュー完了") in the panel header.
+2. When you are done, click the **Complete review** button in the panel header.
 3. The review status becomes `completed`, signaling any waiting agent.
 
 Adding a new comment automatically flips the status back to `reviewing`, so the fix → re-review loop works repeatedly.
@@ -103,6 +114,33 @@ On startup the CLI resets the review status to `reviewing` before polling, so a 
 - `--timeout-ms <ms>` — give up after this long (exit code 1); `0` waits indefinitely (default).
 - `--poll-interval-ms <ms>` — polling interval (default `2000`).
 - `--status <open|resolved|all>` / `--story-id <id>` — filter which comments are included in the output.
+
+## Selector strategy
+
+Canvas Comments locates DOM elements using this priority:
+
+1. `data-ai-source` — source file path (most precise, enables agent-to-source tracing)
+2. `data-testid` — test ID attribute
+3. `id` — element ID
+4. Path selector — structural CSS selector (least stable)
+
+The clicked element is first widened to the closest ancestor carrying one of those attributes, so comments attach to meaningful components rather than leaf nodes.
+
+The `data-ai-source` and `data-ai-component` attributes are the primary signals for AI agents to locate source files from a comment. The addon exports a Vite plugin that marks component files with metadata comments as a starting convention:
+
+```ts
+// .storybook/main.ts — viteFinal hook
+import { canvasCommentsPlugin } from "storybook-addon-canvas-comments";
+
+export const viteFinal = async (config) =>
+  mergeConfig(config, {
+    plugins: [canvasCommentsPlugin()],
+  });
+```
+
+> **Note:** The bundled plugin currently provides metadata annotation as a foundation. For full JSX attribute injection (adding `data-ai-source` / `data-ai-component` to DOM elements at build time), integrate a Babel plugin or custom SWC transform. You can also add these attributes manually to component root elements.
+
+The selector priority is fixed for now. Preset-level customization of the priority list may be added based on user feedback.
 
 ## HTTP API
 
@@ -202,25 +240,14 @@ Comments are stored as a JSON array, designed to be read by AI agents:
 ]
 ```
 
-Each comment may also carry a `domContext` object — a snapshot of the target element and a bounded DOM tree captured at comment time.
-
-### Selector strategy
-
-The stored `selector` is built with this priority:
-
-1. `[data-ai-source="…"]` — a source-location attribute, if your build emits one
-2. `[data-testid="…"]`
-3. `#id`
-4. a short tag / class / `nth-of-type` path selector
-
-The clicked element is first widened to the closest ancestor carrying one of those attributes, so comments attach to meaningful components rather than leaf nodes.
+Each comment may also carry a `domContext` object — a snapshot of the target element and a bounded DOM tree captured at comment time. The stored `selector` is built with the priority described in [Selector strategy](#selector-strategy).
 
 ## Hosted mode (Cloudflare Pages + Turso)
 
 By default comments are stored on the local filesystem via the dev-server middleware. For a statically built Storybook deployed to Cloudflare Pages, the `src/cloudflare/` directory provides Pages Functions that store comments in a Turso (libSQL) database instead:
 
-- `src/cloudflare/functions/api/canvas-comments/` — Pages Functions implementing `GET/POST /api/canvas-comments` and `PATCH/DELETE /api/canvas-comments/:id`
-- `src/cloudflare/schema.sql` — the `canvas_comments` table definition
+- `src/cloudflare/functions/api/canvas-comments/` — Pages Functions implementing `GET/POST /api/canvas-comments`, `PATCH/DELETE /api/canvas-comments/:id`, and `GET/POST /api/canvas-comments/review`
+- `src/cloudflare/schema.sql` — the `canvas_comments` and `review_state` table definitions
 - `src/cloudflare/wrangler.example.toml` — example Pages configuration; set `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` as environment variables
 
 Point the addon at the hosted API via the preset options:
@@ -236,4 +263,8 @@ const config: StorybookConfig = {
 };
 ```
 
-Note: the hosted functions currently implement the comments API only — the review-status API (`/review`) is filesystem-based and not available in hosted mode, so the `wait-comments` flow requires a local dev server.
+Note: the hosted functions persist the review status in the `review_state` table, so the review-status API works in hosted mode with the same JSON shape as the dev server. The `wait-comments` CLI reads the review status file directly, so the agent-blocking flow still requires a local dev server.
+
+## Contributing
+
+Bug reports and pull requests are welcome on GitHub at https://github.com/ksugawara61/curio.

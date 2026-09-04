@@ -9,7 +9,7 @@ import { FsReviewStore } from "../storage/review-store.ts";
 const HELP = `Usage:
   pnpm --filter storybook-addon-canvas-comments wait-comments -- [options]
 
-Blocks until the user clicks "レビュー完了" in the Storybook UI, then prints the
+Blocks until the user clicks "Complete review" in the Storybook UI, then prints the
 open canvas comments (snapshot dom-map JSON) to stdout and exits. Designed for a
 coding agent that started Storybook and wants to detect when review is complete
 before moving on to follow-up work.

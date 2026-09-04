@@ -178,7 +178,7 @@ const reviewStatusStyle = (status: ReviewStatus) => ({
 });
 
 const reviewStatusLabel = (status: ReviewStatus) =>
-  status === "completed" ? "レビュー完了" : "レビュー中";
+  status === "completed" ? "Review completed" : "Reviewing";
 
 const Tool = () => {
   const [globals, updateGlobals] = useGlobals();
@@ -230,7 +230,7 @@ const Panel = () => {
         return;
       }
 
-      // 静的ビルド (Cloudflare Pages SPA fallback) では HTML が返るため JSON でないならスキップ。
+      // Skip non-JSON responses from Cloudflare Pages SPA fallback in static builds.
       const contentType = response.headers.get("content-type") ?? "";
       if (!contentType.includes("application/json")) {
         return;
@@ -239,7 +239,7 @@ const Panel = () => {
       const state = (await response.json()) as ReviewState;
       setReviewStatus(state.status);
     } catch {
-      // dev server 以外（静的ビルド等）では review API が無いため黙ってスキップ。
+      // Silently skip when review API is unavailable (e.g. static builds without dev server).
     }
   }, []);
 
@@ -275,7 +275,7 @@ const Panel = () => {
         throw new Error(`Failed to load comments: ${response.status}`);
       }
 
-      // 静的ビルド (Cloudflare Pages SPA fallback) では HTML が返るため JSON でないならスキップ。
+      // Skip non-JSON responses from Cloudflare Pages SPA fallback in static builds.
       const contentType = response.headers.get("content-type") ?? "";
       if (!contentType.includes("application/json")) {
         return;
@@ -366,7 +366,7 @@ const Panel = () => {
     const channel = addons.getChannel();
     const onCreated = (item: CanvasComment) => {
       setItems((prev) => [item, ...prev.filter((next) => next.id !== item.id)]);
-      // 新規コメントで server 側が reviewing に再アームするため UI も追従する。
+      // A new comment re-arms the server to reviewing, so sync the UI.
       setReviewStatus("reviewing");
     };
     const onUpdated = (item: CanvasComment) => {
@@ -410,10 +410,10 @@ const Panel = () => {
             disabled={reviewStatus === "completed"}
             onClick={() => void completeReview()}
             style={styles.button}
-            title="レビューを完了し、待機中のコーディングエージェントに合図します"
+            title="Mark review as complete and signal waiting coding agents"
             type="button"
           >
-            レビュー完了
+            Complete review
           </button>
           <button
             onClick={() => {

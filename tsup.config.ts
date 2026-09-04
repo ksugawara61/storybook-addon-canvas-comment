@@ -1,0 +1,46 @@
+import { defineConfig } from "tsup";
+
+// tsup injects `baseUrl` into the dts compilerOptions, which TypeScript 6
+// rejects as deprecated (TS5101) unless explicitly ignored.
+const dts = { compilerOptions: { ignoreDeprecations: "6.0" } };
+
+export default defineConfig([
+  {
+    entry: { index: "src/index.ts" },
+    format: ["esm"],
+    dts,
+    outDir: "dist",
+    external: ["storybook", "react", "vite"],
+    clean: true,
+  },
+  {
+    entry: { manager: "src/manager.tsx" },
+    format: ["esm"],
+    dts,
+    outDir: "dist",
+    external: ["storybook", "react", "@storybook/icons"],
+    banner: {
+      // Storybook manager bundles with classic JSX runtime — react must be in scope.
+      js: 'import React from "react";',
+    },
+  },
+  {
+    entry: { preview: "src/preview.ts" },
+    format: ["esm"],
+    dts,
+    outDir: "dist",
+    external: ["storybook", "react", "vite"],
+  },
+  {
+    entry: {
+      "cli/dom-map": "src/cli/dom-map.ts",
+      "cli/wait-comments": "src/cli/wait-comments.ts",
+    },
+    format: ["esm"],
+    outDir: "dist",
+    external: ["@playwright/test"],
+    banner: {
+      js: "#!/usr/bin/env node",
+    },
+  },
+]);

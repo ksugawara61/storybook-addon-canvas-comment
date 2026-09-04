@@ -102,6 +102,9 @@ const pathSelectorFor = (el: HTMLElement) => {
   return segments.join(" > ") || el.tagName.toLowerCase();
 };
 
+// The selector priority (data-ai-source → data-testid → id → path) is intentionally
+// fixed — customizing it via addon preset options is not supported yet and may be
+// added in a future version based on user feedback.
 const selectorFor = (el: HTMLElement) => {
   const aiSource = el.getAttribute("data-ai-source");
   if (aiSource) return `[data-ai-source="${escapeCss(aiSource)}"]`;
@@ -284,7 +287,7 @@ const promptCommentNote = (point: {
 
     const textarea = document.createElement("textarea");
     textarea.setAttribute(OVERLAY_ATTRIBUTE, "true");
-    textarea.placeholder = "UI フィードバックを入力…";
+    textarea.placeholder = "Enter UI feedback…";
     textarea.rows = 4;
     Object.assign(textarea.style, {
       background: "rgba(255, 255, 255, 0.08)",
@@ -309,7 +312,7 @@ const promptCommentNote = (point: {
 
     const cancelButton = document.createElement("button");
     cancelButton.type = "button";
-    cancelButton.textContent = "キャンセル";
+    cancelButton.textContent = "Cancel";
     cancelButton.setAttribute(OVERLAY_ATTRIBUTE, "true");
     Object.assign(cancelButton.style, {
       background: "transparent",
@@ -323,7 +326,7 @@ const promptCommentNote = (point: {
 
     const saveButton = document.createElement("button");
     saveButton.type = "button";
-    saveButton.textContent = "保存";
+    saveButton.textContent = "Save";
     saveButton.disabled = true;
     saveButton.setAttribute(OVERLAY_ATTRIBUTE, "true");
     Object.assign(saveButton.style, {
@@ -438,7 +441,7 @@ const createCommentPin = (comment: CanvasComment) => {
 
   const resolveButton = document.createElement("button");
   resolveButton.type = "button";
-  resolveButton.textContent = "解決";
+  resolveButton.textContent = "Resolve";
   resolveButton.setAttribute(OVERLAY_ATTRIBUTE, "true");
   Object.assign(resolveButton.style, {
     background: "#10b981",
@@ -517,8 +520,8 @@ const renderCommentOverlay = (items: CanvasComment[]) => {
 
 const loadOpenComments = async (storyId: string) => {
   const apiPath = getApiPath();
-  // カスタム apiUrl 未設定の PROD ビルドでは dev server が存在しないためスキップ。
-  // Cloudflare の SPA fallback が HTML を返し無限ループになるのを防ぐ。
+  // Skip in PROD builds without a custom apiUrl — no dev server exists.
+  // Prevent Cloudflare SPA fallback from returning HTML and causing an infinite loop.
   if (import.meta.env.PROD && apiPath === API_PATH)
     return [] as CanvasComment[];
 
@@ -589,7 +592,7 @@ const createComment = async (
 
   const apiPath = getApiPath();
   if (import.meta.env.PROD && apiPath === API_PATH) {
-    window.alert("UI フィードバックは dev サーバでのみ保存できます");
+    window.alert("UI feedback can only be saved on the dev server");
     return;
   }
 
