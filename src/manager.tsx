@@ -27,6 +27,7 @@ import {
 } from "./constants";
 import type {
   CanvasComment,
+  CanvasCommentA11yAnchor,
   CanvasCommentStatus,
   ReviewState,
   ReviewStatus,
@@ -164,6 +165,12 @@ const formatDate = (value: string) => {
 
   return date.toLocaleString();
 };
+
+// e.g. `group "Milk" > button "Delete" #2`
+const formatA11yAnchor = (anchor: CanvasCommentA11yAnchor) =>
+  [...anchor.ancestors, anchor]
+    .map((node) => `${node.role} "${node.name}"`)
+    .join(" > ") + (anchor.index > 0 ? ` #${anchor.index + 1}` : "");
 
 const statusStyle = (status: CanvasCommentStatus) => ({
   ...styles.status,
@@ -448,6 +455,14 @@ const Panel = () => {
             <div style={styles.storyTitle}>{item.storyTitle}</div>
             <p style={styles.note}>{item.note}</p>
             <dl style={styles.metaList}>
+              {item.domContext?.a11yAnchor ? (
+                <>
+                  <dt style={styles.metaLabel}>a11y</dt>
+                  <dd style={styles.metaValue}>
+                    <code>{formatA11yAnchor(item.domContext.a11yAnchor)}</code>
+                  </dd>
+                </>
+              ) : null}
               <dt style={styles.metaLabel}>selector</dt>
               <dd style={styles.metaValue}>
                 <code>{item.selector}</code>

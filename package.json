@@ -5,7 +5,8 @@
     "canvas-comments-wait-comments": "./dist/cli/wait-comments.js"
   },
   "dependencies": {
-    "@libsql/client": "catalog:"
+    "@libsql/client": "catalog:",
+    "dom-accessibility-api": "catalog:"
   },
   "description": "Storybook addon for inline UI feedback on the canvas — click to annotate, review in a panel, and hand structured context to coding agents via a filesystem dom-map.",
   "devDependencies": {
@@ -13,6 +14,7 @@
     "@storybook/icons": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
+    "jsdom": "catalog:",
     "react": "catalog:",
     "storybook": "catalog:",
     "tsup": "catalog:",

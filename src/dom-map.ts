@@ -1,10 +1,16 @@
 import fs from "node:fs/promises";
 import { resolve } from "node:path";
-import { type Browser, chromium, type Page } from "@playwright/test";
+import {
+  type Browser,
+  chromium,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 import { isCanvasComment } from "./comment-schema";
 import { API_PATH, STORAGE_RELATIVE_PATH } from "./constants";
 import type {
   CanvasComment,
+  CanvasCommentA11yAnchor,
   CanvasCommentDomContext,
   CanvasCommentPoint,
   CanvasCommentRect,
@@ -37,6 +43,7 @@ export type CanvasCommentDomMapOptions = {
 
 export type CanvasCommentDomMapItem = {
   comment: {
+    a11yAnchor?: CanvasCommentA11yAnchor;
     createdAt: string;
     currentPointer: CanvasCommentPoint;
     dataAiComponent?: string;
@@ -50,7 +57,7 @@ export type CanvasCommentDomMapItem = {
     storedRect: CanvasCommentRect;
   };
   error?: string;
-  matchType: "none" | "pointer" | "selector" | "snapshot";
+  matchType: "a11y" | "none" | "pointer" | "selector" | "snapshot";
   target: DomElementSummary | null;
 };
 
@@ -265,6 +272,7 @@ const buildCommentItemFromSnapshot = (
   if (!domContext) {
     return {
       comment: {
+        a11yAnchor: comment.domContext?.a11yAnchor,
         createdAt: comment.createdAt,
         currentPointer: comment.pointer,
         dataAiComponent: comment.dataAiComponent,
@@ -286,6 +294,7 @@ const buildCommentItemFromSnapshot = (
 
   return {
     comment: {
+      a11yAnchor: comment.domContext?.a11yAnchor,
       createdAt: comment.createdAt,
       currentPointer: comment.pointer,
       dataAiComponent: comment.dataAiComponent,
@@ -378,6 +387,53 @@ const createSnapshotDomMap = async (
 // Playwright engine
 // ---------------------------------------------------------------------------
 
+type AriaRole = Parameters<Page["getByRole"]>[0];
+
+const A11Y_TARGET_ATTRIBUTE = "data-canvas-comments-a11y-target";
+
+// Mirrors resolveA11yAnchor in a11y-anchor.ts with Playwright's getByRole, which
+// computes roles and accessible names the same way dom-accessibility-api does.
+const locateA11yAnchor = (page: Page, anchor: CanvasCommentA11yAnchor) =>
+  anchor.ancestors
+    .reduce<Locator>(
+      (scope, node) =>
+        scope.getByRole(node.role as AriaRole, {
+          exact: true,
+          name: node.name,
+        }),
+      page.locator("#storybook-root"),
+    )
+    .getByRole(anchor.role as AriaRole, { exact: true, name: anchor.name })
+    .nth(anchor.index);
+
+/**
+ * Tags each comment's accessibility-tree target with its comment id so the
+ * in-page mapping below can pick it up before falling back to selector/pointer.
+ */
+const markA11yAnchorTargets = async (page: Page, comments: CanvasComment[]) => {
+  for (const comment of comments) {
+    const anchor = comment.domContext?.a11yAnchor;
+
+    if (!anchor) continue;
+
+    const target = locateA11yAnchor(page, anchor);
+
+    try {
+      if ((await target.count()) === 0) continue;
+
+      await target.evaluate(
+        (element, input) => {
+          const ids = element.getAttribute(input.attribute)?.split(" ") ?? [];
+          element.setAttribute(input.attribute, [...ids, input.id].join(" "));
+        },
+        { attribute: A11Y_TARGET_ATTRIBUTE, id: comment.id },
+      );
+    } catch {
+      // Leave unmarked; the comment falls back to selector / pointer matching.
+    }
+  }
+};
+
 const installEvaluateNameHelper = async (page: Page) => {
   await page.evaluate(`(() => {
     if (typeof globalThis.__name !== "function") {
@@ -468,6 +524,7 @@ const mergeMappedComments = (
     return [
       {
         comment: {
+          a11yAnchor: comment.domContext?.a11yAnchor,
           createdAt: comment.createdAt,
           currentPointer: mapped.currentPointer,
           dataAiComponent: comment.dataAiComponent,
@@ -513,9 +570,11 @@ const mapStoryComments = async (
       timeoutMs: options.timeoutMs,
     });
     await installEvaluateNameHelper(page);
+    await markA11yAnchorTargets(page, group.comments);
 
     const browserResult = await page.evaluate(
       (input: {
+        a11yTargetAttribute: string;
         comments: CanvasComment[];
         includeDomTree: boolean;
         maxDomChildren: number;
@@ -768,12 +827,39 @@ const mapStoryComments = async (
           };
         };
 
+        const findByA11yMark = (comment: CanvasComment) => {
+          const offset = comment.domContext?.a11yAnchor?.offset;
+          const element = offset
+            ? document.querySelector(
+                `[${input.a11yTargetAttribute}~="${CSS.escape(comment.id)}"]`,
+              )
+            : null;
+
+          if (!offset || !element) {
+            return null;
+          }
+
+          const rect = element.getBoundingClientRect();
+
+          return {
+            currentPointer: {
+              x: rect.x + rect.width * offset.x,
+              y: rect.y + rect.height * offset.y,
+            },
+            resolved: {
+              error: undefined,
+              matchType: "a11y" as const,
+              target: element,
+            },
+          };
+        };
+
         const mapComment = (comment: CanvasComment) => {
-          const currentPointer = scale(comment);
-          const resolved = resolveCommentTarget(
-            comment.selector,
-            currentPointer,
-          );
+          const a11yMatch = findByA11yMark(comment);
+          const currentPointer = a11yMatch?.currentPointer ?? scale(comment);
+          const resolved =
+            a11yMatch?.resolved ??
+            resolveCommentTarget(comment.selector, currentPointer);
 
           if (resolved.target) {
             targetComments.set(resolved.target, [
@@ -854,6 +940,7 @@ const mapStoryComments = async (
         };
       },
       {
+        a11yTargetAttribute: A11Y_TARGET_ATTRIBUTE,
         comments: group.comments,
         includeDomTree: options.includeDomTree,
         maxDomChildren: options.maxDomChildren,

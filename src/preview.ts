@@ -4,12 +4,15 @@ import type {
   StoryContext,
 } from "storybook/internal/types";
 import { addons, useEffect, useGlobals } from "storybook/preview-api";
+import { createA11yAnchor } from "./a11y-anchor";
+import { resolveCommentPoint } from "./comment-point";
 import {
   API_HEADERS,
   API_PATH,
   COMMENTS_VISIBLE_PARAM_KEY,
   EVENTS,
   getApiPath,
+  OVERLAY_ATTRIBUTE,
   PARAM_KEY,
 } from "./constants";
 import { summarizeTarget } from "./dom-summary";
@@ -18,7 +21,6 @@ import type { CanvasComment } from "./types";
 const OVERLAY_ROOT_ID = "storybook-addon-canvas-comments-overlay";
 const INPUT_ROOT_ID = "storybook-addon-canvas-comments-input";
 const DRAFT_PIN_ID = "storybook-addon-canvas-comments-draft-pin";
-const OVERLAY_ATTRIBUTE = "data-canvas-comments-overlay";
 
 export const globalTypes = {
   [COMMENTS_VISIBLE_PARAM_KEY]: {
@@ -136,17 +138,8 @@ const resolveElement = (target: EventTarget | null): HTMLElement | null => {
   return null;
 };
 
-const scalePoint = (comment: CanvasComment) => {
-  const width = Math.max(comment.viewport.width, 1);
-  const height = Math.max(comment.viewport.height, 1);
-  const x = (comment.pointer.x / width) * window.innerWidth;
-  const y = (comment.pointer.y / height) * window.innerHeight;
-
-  return {
-    x: clamp(x, 8, window.innerWidth - 8),
-    y: clamp(y, 8, window.innerHeight - 8),
-  };
-};
+const storyRoot = () =>
+  document.getElementById("storybook-root") ?? document.body;
 
 const removeCommentInputRoot = () => {
   document.getElementById(INPUT_ROOT_ID)?.remove();
@@ -369,16 +362,32 @@ const promptCommentNote = (point: {
   });
 };
 
+const positionCommentPin = (
+  wrapper: HTMLElement,
+  tooltip: HTMLElement,
+  comment: CanvasComment,
+) => {
+  const point = resolveCommentPoint(comment, storyRoot(), {
+    height: window.innerHeight,
+    width: window.innerWidth,
+  });
+  const x = clamp(point.x, 8, window.innerWidth - 8);
+  const y = clamp(point.y, 8, window.innerHeight - 8);
+  const placeTooltipLeft = x > window.innerWidth - 320;
+
+  Object.assign(wrapper.style, { left: `${x}px`, top: `${y}px` });
+  Object.assign(tooltip.style, {
+    left: placeTooltipLeft ? "auto" : "24px",
+    right: placeTooltipLeft ? "24px" : "auto",
+  });
+};
+
 const createCommentPin = (comment: CanvasComment) => {
   const wrapper = document.createElement("div");
-  const point = scalePoint(comment);
-  const placeTooltipLeft = point.x > window.innerWidth - 320;
   wrapper.setAttribute(OVERLAY_ATTRIBUTE, "true");
   Object.assign(wrapper.style, {
-    left: `${point.x}px`,
     pointerEvents: "auto",
     position: "absolute",
-    top: `${point.y}px`,
     transform: "translate(-50%, -50%)",
   });
 
@@ -409,14 +418,12 @@ const createCommentPin = (comment: CanvasComment) => {
     display: "flex",
     flexDirection: "column",
     font: "12px/1.45 system-ui, sans-serif",
-    left: placeTooltipLeft ? "auto" : "24px",
     maxWidth: "280px",
     minWidth: "120px",
     opacity: "0",
     padding: "8px 10px",
     pointerEvents: "auto",
     position: "absolute",
-    right: placeTooltipLeft ? "24px" : "auto",
     top: "50%",
     transform: "translateY(-50%)",
     transition: "opacity 120ms ease, visibility 120ms ease",
@@ -485,7 +492,11 @@ const createCommentPin = (comment: CanvasComment) => {
   pin.addEventListener("blur", hide);
 
   wrapper.append(pin, tooltip);
-  return wrapper;
+
+  return {
+    element: wrapper,
+    reposition: () => positionCommentPin(wrapper, tooltip, comment),
+  };
 };
 
 const removeCommentOverlay = () => {
@@ -514,8 +525,51 @@ const ensureCommentOverlayRoot = () => {
 };
 
 const renderCommentOverlay = (items: CanvasComment[]) => {
-  const root = ensureCommentOverlayRoot();
-  root.replaceChildren(...items.map(createCommentPin));
+  const pins = items.map(createCommentPin);
+  const reposition = () => {
+    for (const pin of pins) pin.reposition();
+  };
+
+  reposition();
+  ensureCommentOverlayRoot().replaceChildren(...pins.map((pin) => pin.element));
+
+  return reposition;
+};
+
+/**
+ * Calls `onChange` (at most once per frame) whenever the story's layout may
+ * have moved anchored elements: resize, scroll, or DOM changes in the story.
+ */
+const observeLayout = (onChange: () => void) => {
+  let frame = 0;
+  const schedule = () => {
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(onChange);
+  };
+  const root = storyRoot();
+  const resizeObserver = new ResizeObserver(schedule);
+  // The overlay lives outside #storybook-root, so pin updates do not retrigger
+  // this observer. When the root is missing, skip DOM observation to avoid a loop.
+  const mutationObserver =
+    root === document.body ? undefined : new MutationObserver(schedule);
+
+  resizeObserver.observe(root);
+  mutationObserver?.observe(root, {
+    attributes: true,
+    characterData: true,
+    childList: true,
+    subtree: true,
+  });
+  window.addEventListener("resize", schedule);
+  window.addEventListener("scroll", schedule, true);
+
+  return () => {
+    cancelAnimationFrame(frame);
+    resizeObserver.disconnect();
+    mutationObserver?.disconnect();
+    window.removeEventListener("resize", schedule);
+    window.removeEventListener("scroll", schedule, true);
+  };
 };
 
 const loadOpenComments = async (storyId: string) => {
@@ -553,6 +607,7 @@ const createComment = async (
 
   const anchor = findCommentTarget(target);
   const rect = anchor.getBoundingClientRect();
+  const pointer = { x: event.clientX, y: event.clientY };
   const id = createId();
   const createdAt = new Date().toISOString();
   const viewport = { height: window.innerHeight, width: window.innerWidth };
@@ -568,6 +623,7 @@ const createComment = async (
     dataAiSource: optionalAttribute(anchor, "data-ai-source"),
     dataTestId: optionalAttribute(anchor, "data-testid"),
     domContext: {
+      a11yAnchor: createA11yAnchor(target, pointer, storyRoot()),
       capturedAt: createdAt,
       domTree,
       target: domTarget,
@@ -575,7 +631,7 @@ const createComment = async (
     },
     id,
     note: normalizedNote,
-    pointer: { x: event.clientX, y: event.clientY },
+    pointer,
     rect: {
       height: rect.height,
       width: rect.width,
@@ -679,10 +735,11 @@ const WithCanvasComments = (
 
     let disposed = false;
     let items: CanvasComment[] = [];
+    let reposition = () => {};
 
     const render = () => {
       if (!disposed) {
-        renderCommentOverlay(items);
+        reposition = renderCommentOverlay(items);
       }
     };
 
@@ -721,14 +778,14 @@ const WithCanvasComments = (
     channel.on(EVENTS.CREATED, onCreated);
     channel.on(EVENTS.DELETED, onDeleted);
     channel.on(EVENTS.UPDATED, onUpdated);
-    window.addEventListener("resize", render);
+    const stopObservingLayout = observeLayout(() => reposition());
 
     return () => {
       disposed = true;
       channel.off(EVENTS.CREATED, onCreated);
       channel.off(EVENTS.DELETED, onDeleted);
       channel.off(EVENTS.UPDATED, onUpdated);
-      window.removeEventListener("resize", render);
+      stopObservingLayout();
       removeCommentOverlay();
     };
   }, [commentsVisible, context.id, context.viewMode]);

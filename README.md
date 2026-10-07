@@ -4,7 +4,8 @@ A Storybook addon for leaving inline UI feedback comments directly on the canvas
 It is designed so that coding agents (AI assistants) can pick up the feedback and act on it.
 
 Click any element in a story and type a note.
-The comment is saved together with a CSS selector and pointer coordinates.
+The comment is anchored to the element's role and accessible name in the accessibility tree.
+A CSS selector and pointer coordinates are saved too, as fallbacks.
 A DOM snapshot of the target element is saved with it too.
 A companion CLI lets an agent block until you finish reviewing.
 The agent then receives all open comments as structured JSON.
@@ -130,6 +131,36 @@ Pass `--no-reset` to skip the reset. Other options:
 - `--poll-interval-ms <ms>` — polling interval (default `2000`).
 - `--status <open|resolved|all>` / `--story-id <id>` — filter which comments are included in the output.
 
+## Accessibility-tree anchor
+
+On click, the addon walks up to the nearest element with a role and an accessible name.
+An example is `button "Save"`.
+It stores that element as `domContext.a11yAnchor`:
+
+- `role` / `name` — the element's ARIA role and accessible name.
+- `ancestors` — up to three named ancestors, outermost first, such as `group "Milk"`.
+  They tell same-named elements apart.
+- `index` — position among elements that still match role, name, and ancestors.
+- `offset` — the click position inside the element's box, as a 0–1 ratio.
+
+Roles and names come from [`dom-accessibility-api`](https://github.com/eps1lon/dom-accessibility-api).
+Testing Library's `getByRole` uses the same library.
+Pins on the canvas re-resolve the anchor whenever the story's layout or DOM changes.
+So they follow the element when it moves or resizes.
+
+Pins resolve their position in this order:
+
+1. The accessibility-tree anchor.
+2. The stored `selector`, only when it is an attribute or id selector.
+   Positional path selectors are skipped.
+3. The stored pointer, scaled from the original viewport.
+
+The anchor is missing when no element up to `#storybook-root` has both a role and a name.
+It no longer resolves after the element's accessible name changes.
+In both cases the next fallback is used.
+Anchors get more reliable when interactive elements and landmarks have a role and a label.
+The same labels also help Testing Library queries.
+
 ## Selector strategy
 
 Canvas Comments locates DOM elements using this priority:
@@ -220,11 +251,12 @@ pnpm --filter storybook-addon-canvas-comments dom-map -- \
 
 The CLI resolves each comment's target in this order:
 
-1. Resolve the stored `selector` with `document.querySelector`.
-2. If that fails, scale the stored pointer from the original viewport to the current one.
+1. Resolve the accessibility-tree anchor with Playwright's `getByRole` (`matchType: "a11y"`).
+2. If that fails, resolve the stored `selector` with `document.querySelector`.
+3. If that fails, scale the stored pointer from the original viewport to the current one.
    Then fall back to `document.elementsFromPoint`.
 
-The output includes the stored coordinates and the current coordinates.
+The output includes the stored anchor, the stored coordinates, and the current coordinates.
 It also includes the matched element's tag / attributes / rect / text / ancestors.
 With `--include-dom-tree` a bounded DOM tree is also included.
 The `snapshot` engine keeps only the **subtree rooted at each comment target**.
@@ -278,6 +310,7 @@ Comments are stored as a JSON array, designed to be read by AI agents:
 
 Each comment may also carry a `domContext` object.
 It is a snapshot of the target element and a bounded DOM tree captured at comment time.
+It also holds the `a11yAnchor` described in [Accessibility-tree anchor](#accessibility-tree-anchor).
 The stored `selector` is built with the priority described in [Selector strategy](#selector-strategy).
 
 ## Hosted mode (Cloudflare Pages + Turso)

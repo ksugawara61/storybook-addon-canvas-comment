@@ -24,6 +24,26 @@ export type CanvasCommentViewport = {
   height: number;
 };
 
+export type CanvasCommentA11yNode = {
+  /** Computed accessible name, e.g. "Save". */
+  name: string;
+  /** Explicit or implicit ARIA role, e.g. "button". */
+  role: string;
+};
+
+/**
+ * Locates the commented element through the accessibility tree instead of
+ * absolute coordinates, so the anchor survives layout changes.
+ */
+export type CanvasCommentA11yAnchor = CanvasCommentA11yNode & {
+  /** Nearest named ancestors (role + name), outermost first. */
+  ancestors: CanvasCommentA11yNode[];
+  /** Position among elements matching the same role, name, and ancestors. */
+  index: number;
+  /** Comment position inside the element's box as a 0–1 ratio. */
+  offset: CanvasCommentPoint;
+};
+
 export type DomElementSummary = {
   ancestors: Array<{
     attributes: Record<string, string>;
@@ -52,6 +72,7 @@ export type DomTreeNode = {
 };
 
 export type CanvasCommentDomContext = {
+  a11yAnchor?: CanvasCommentA11yAnchor;
   capturedAt: string;
   domTree: DomTreeNode;
   target: DomElementSummary;

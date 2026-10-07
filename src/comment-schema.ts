@@ -24,6 +24,19 @@ const isViewport = (value: unknown): value is CanvasComment["viewport"] =>
   typeof value.width === "number" &&
   typeof value.height === "number";
 
+const isA11yNode = (value: unknown): value is Record<string, unknown> =>
+  isRecord(value) &&
+  typeof value.role === "string" &&
+  typeof value.name === "string";
+
+const isOptionalA11yAnchor = (value: unknown) =>
+  value === undefined ||
+  (isA11yNode(value) &&
+    Array.isArray(value.ancestors) &&
+    value.ancestors.every(isA11yNode) &&
+    typeof value.index === "number" &&
+    isPoint(value.offset));
+
 /**
  * Shallow validation for the optional domContext field.
  * Existing comments without domContext still pass (undefined is valid).
@@ -40,7 +53,8 @@ const isOptionalDomContext = (
     typeof value.capturedAt === "string" &&
     isViewport(value.viewport) &&
     isRecord(value.target) &&
-    isRecord(value.domTree)
+    isRecord(value.domTree) &&
+    isOptionalA11yAnchor(value.a11yAnchor)
   );
 };
 

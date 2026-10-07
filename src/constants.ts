@@ -4,6 +4,8 @@ export const OVERLAY_TOOL_ID = `${ADDON_ID}/overlay-tool`;
 export const PANEL_ID = `${ADDON_ID}/panel`;
 export const PARAM_KEY = "canvasCommentsEnabled";
 export const COMMENTS_VISIBLE_PARAM_KEY = "canvasCommentsVisible";
+/** Marks addon-owned DOM (pins, popovers) so it is ignored when targeting. */
+export const OVERLAY_ATTRIBUTE = "data-canvas-comments-overlay";
 export const BASE_API_PATH = "/__canvas-comments";
 export const API_PATH = `${BASE_API_PATH}/comments`;
 export const REVIEW_API_PATH = `${BASE_API_PATH}/review`;

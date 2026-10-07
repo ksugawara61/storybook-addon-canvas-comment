@@ -193,6 +193,22 @@ describe("loadCanvasCommentsFromDisk", () => {
     expect(await loadCanvasCommentsFromDisk("/path.json")).toEqual([comment]);
   });
 
+  it("drops comments whose a11yAnchor is malformed", async () => {
+    const valid = createComment({ domContext: createDomContext() });
+    const malformed = createComment({
+      domContext: {
+        ...createDomContext(),
+        a11yAnchor: { name: "Save", role: "button" },
+      } as unknown as CanvasCommentDomContext,
+      id: "comment-2",
+    });
+    vi.mocked(fs.readFile).mockResolvedValue(
+      JSON.stringify([valid, malformed]) as never,
+    );
+
+    expect(await loadCanvasCommentsFromDisk("/path.json")).toEqual([valid]);
+  });
+
   it("filters out invalid entries", async () => {
     const comment = createComment();
     vi.mocked(fs.readFile).mockResolvedValue(

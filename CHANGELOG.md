@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Anchor comments to the accessibility tree via `domContext.a11yAnchor`.
+  The anchor holds the role, the accessible name, and named ancestors.
+- Canvas pins follow their anchored element on resize, scroll, and DOM changes.
+- `dom-map` resolves the accessibility-tree anchor first and reports `matchType: "a11y"`.
+
 ## 0.1.0
 
 Initial OSS release.
