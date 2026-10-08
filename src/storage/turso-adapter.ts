@@ -171,6 +171,26 @@ export class TursoAdapter implements StorageAdapter {
     return deleted;
   }
 
+  async removeResolved(): Promise<CanvasComment[]> {
+    const deleted = (await this.list()).filter((c) => c.status === "resolved");
+    if (deleted.length === 0) return [];
+    await this.#client.batch(
+      [
+        {
+          args: ["resolved"],
+          sql: `DELETE FROM canvas_comment_replies WHERE comment_id IN
+            (SELECT id FROM canvas_comments WHERE status = ?)`,
+        },
+        {
+          args: ["resolved"],
+          sql: "DELETE FROM canvas_comments WHERE status = ?",
+        },
+      ],
+      "write",
+    );
+    return deleted;
+  }
+
   async #find(id: string): Promise<CanvasComment | null> {
     const [comments, replies] = await Promise.all([
       this.#client.execute({

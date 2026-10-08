@@ -16,4 +16,6 @@ export type StorageAdapter = {
     reply: CanvasCommentReply,
   ): Promise<CanvasComment | null>;
   remove(id: string): Promise<CanvasComment | null>;
+  /** Deletes every resolved comment with its replies; returns the deleted ones. */
+  removeResolved(): Promise<CanvasComment[]>;
 };

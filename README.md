@@ -27,7 +27,7 @@ The agent then receives all open comments as structured JSON.
 | --- | --- |
 | Inline commenting | Toggle "UI Feedback" in the toolbar, click an element on the canvas, and type a note in the popover. |
 | Comment pins | Saved comments are shown as pins on the canvas. Hover or focus a pin to read the note and resolve it in place. Toggle pin visibility from the toolbar (eye icon) or the panel header. |
-| Addon panel | A "UI Feedback" panel lists all comments with their selector and metadata. It supports reopen / resolve / delete. |
+| Addon panel | A "UI Feedback" panel lists all comments with their selector and metadata. It supports reopen / resolve / delete, and deleting every resolved comment at once. |
 | Replies | Each comment has a reply thread. Reviewers reply from the panel. Coding agents reply with the `reply` CLI to explain what they changed. |
 | Review-completion signal | A "Complete review" button in the panel flips a review status flag. A waiting coding agent can detect it. |
 | Agent-friendly output | The `dom-map` and `wait-comments` CLIs pair each comment with its saved DOM snapshot. They emit JSON built for LLM consumption. |
@@ -87,6 +87,11 @@ Comments are stored under the directory where the Storybook dev server runs:
 ```text
 .storybook/canvas-comments/comments.json
 ```
+
+Resolved comments stay in this file until you delete them.
+The **Delete resolved (N)** button in the panel header deletes all resolved comments in every story.
+Their replies are deleted too.
+Open comments are kept.
 
 Treat this file as local feedback data (add it to `.gitignore`). A coding agent can read the JSON directly, or use the CLIs below for DOM-mapped output.
 
@@ -200,6 +205,7 @@ With the Vite builder, the addon preset adds a middleware to the Storybook dev s
 ```text
 GET    /__canvas-comments/comments
 POST   /__canvas-comments/comments
+DELETE /__canvas-comments/comments?status=resolved
 PATCH  /__canvas-comments/comments/:id
 DELETE /__canvas-comments/comments/:id
 POST   /__canvas-comments/comments/:id/replies
@@ -216,6 +222,11 @@ POST   /__canvas-comments/review
 ```
 
 `DELETE` removes the comment from `comments.json` and returns the deleted comment.
+
+`DELETE /__canvas-comments/comments?status=resolved` removes every resolved comment.
+It returns the deleted comments as an array.
+Only `status=resolved` is accepted, and any other query returns `400`.
+So open comments are never bulk-deleted.
 
 `POST /__canvas-comments/comments/:id/replies` appends a reply and returns the updated comment.
 `author` is `reviewer` or `agent`, and `body` must not be blank:
@@ -345,6 +356,7 @@ They store comments in a Turso (libSQL) database instead:
 
 - `src/cloudflare/functions/api/canvas-comments/` — Pages Functions implementing these routes
   - `GET/POST /api/canvas-comments`
+  - `DELETE /api/canvas-comments?status=resolved`
   - `PATCH/DELETE /api/canvas-comments/:id`
   - `POST /api/canvas-comments/:id/replies`
   - `GET/POST /api/canvas-comments/review`

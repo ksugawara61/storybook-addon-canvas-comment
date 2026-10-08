@@ -82,6 +82,21 @@ const handleCollectionRequest = async (
     return;
   }
 
+  if (req.method === "DELETE") {
+    const status = new URL(req.url ?? "", "http://localhost").searchParams.get(
+      "status",
+    );
+
+    // Only resolved comments can be bulk-deleted, so open feedback is never lost.
+    if (status !== "resolved") {
+      json(res, 400, { error: "Only status=resolved can be bulk-deleted" });
+      return;
+    }
+
+    json(res, 200, await adapter.removeResolved());
+    return;
+  }
+
   if (req.method !== "POST") {
     json(res, 405, { error: "Method not allowed" });
     return;

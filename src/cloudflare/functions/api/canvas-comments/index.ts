@@ -27,6 +27,16 @@ export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
   return json(comments);
 };
 
+export const onRequestDelete: PagesFunction<Env> = async ({ env, request }) => {
+  // Only resolved comments can be bulk-deleted, so open feedback is never lost.
+  if (new URL(request.url).searchParams.get("status") !== "resolved") {
+    return json({ error: "Only status=resolved can be bulk-deleted" }, 400);
+  }
+
+  const adapter = createAdapter(env);
+  return json(await adapter.removeResolved());
+};
+
 export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
   const body = await request.json().catch(() => null);
 

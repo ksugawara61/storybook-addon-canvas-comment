@@ -64,6 +64,15 @@ export class FsAdapter implements StorageAdapter {
     return deleted;
   }
 
+  async removeResolved(): Promise<CanvasComment[]> {
+    const comments = await this.list();
+    const deleted = comments.filter((c) => c.status === "resolved");
+    if (deleted.length > 0) {
+      await this.#write(comments.filter((c) => c.status !== "resolved"));
+    }
+    return deleted;
+  }
+
   async #write(comments: CanvasComment[]): Promise<void> {
     await fs.mkdir(dirname(this.#file), { recursive: true });
     await fs.writeFile(this.#file, `${JSON.stringify(comments, null, 2)}\n`);

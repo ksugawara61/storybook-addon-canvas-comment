@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Delete every resolved comment at once.
+  The panel header has a **Delete resolved (N)** button that asks for confirmation first.
+  `DELETE /comments?status=resolved` is added to the dev server and the hosted Pages Functions.
+  It deletes the replies of those comments too.
+
 - Add reply threads to comments.
   Reviewers reply from the panel, and coding agents reply with the new `reply` CLI.
   Each reply records whether a reviewer or an agent wrote it.

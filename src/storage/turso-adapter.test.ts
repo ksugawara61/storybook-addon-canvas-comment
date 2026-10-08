@@ -137,3 +137,57 @@ describe("TursoAdapter replies", () => {
     expect((await adapter.list())[0]?.replies).toBeUndefined();
   });
 });
+
+describe("TursoAdapter removeResolved", () => {
+  const comment = (id: string, status: CanvasComment["status"]) =>
+    ({
+      createdAt: "2026-06-12T00:00:00.000Z",
+      id,
+      note: `Note ${id}`,
+      pointer: { x: 100, y: 200 },
+      rect: { height: 40, width: 80, x: 80, y: 180 },
+      selector: "#target",
+      status,
+      storyId: "button--default",
+      storyName: "Default",
+      storyTitle: "Button",
+      viewport: { height: 800, width: 400 },
+    }) satisfies CanvasComment;
+
+  const createDbAdapter = async () => {
+    const client = createClient({ url: ":memory:" });
+    const schema = await fs.readFile(
+      fileURLToPath(new URL("../cloudflare/schema.sql", import.meta.url)),
+      "utf8",
+    );
+    await client.executeMultiple(schema);
+    return new TursoAdapter(client);
+  };
+
+  it("deletes only resolved comments and returns them", async () => {
+    const adapter = await createDbAdapter();
+    await adapter.create(comment("open-1", "open"));
+    await adapter.create(comment("resolved-1", "resolved"));
+
+    const deleted = await adapter.removeResolved();
+
+    expect(deleted.map((c) => c.id)).toEqual(["resolved-1"]);
+    expect((await adapter.list()).map((c) => c.id)).toEqual(["open-1"]);
+  });
+
+  it("deletes the replies of resolved comments", async () => {
+    const adapter = await createDbAdapter();
+    await adapter.create(comment("resolved-1", "resolved"));
+    await adapter.addReply("resolved-1", {
+      author: "agent",
+      body: "Fixed",
+      createdAt: "2026-06-13T00:00:00.000Z",
+      id: "r1",
+    });
+
+    await adapter.removeResolved();
+    await adapter.create(comment("resolved-1", "resolved"));
+
+    expect((await adapter.list())[0]?.replies).toBeUndefined();
+  });
+});

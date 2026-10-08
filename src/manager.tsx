@@ -217,6 +217,19 @@ const formatDate = (value: string) => {
   return date.toLocaleString();
 };
 
+const requestDeleteResolved = async (): Promise<CanvasComment[]> => {
+  const response = await fetch(`${getApiPath()}?status=resolved`, {
+    headers: API_HEADERS,
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete resolved comments: ${response.status}`);
+  }
+
+  return (await response.json()) as CanvasComment[];
+};
+
 // e.g. `group "Milk" > button "Delete" #2`
 const formatA11yAnchor = (anchor: CanvasCommentA11yAnchor) =>
   [...anchor.ancestors, anchor]
@@ -515,6 +528,37 @@ const Panel = () => {
     }
   }, []);
 
+  const resolvedCount = items.filter(
+    (item) => item.status === "resolved",
+  ).length;
+
+  const deleteResolvedComments = useCallback(async () => {
+    const confirmed = window.confirm(
+      `Delete ${resolvedCount} resolved UI feedback?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const deleted = await requestDeleteResolved();
+      const deletedIds = new Set(deleted.map((item) => item.id));
+      setItems((prev) => prev.filter((next) => !deletedIds.has(next.id)));
+      const channel = addons.getChannel();
+      for (const item of deleted) {
+        channel.emit(EVENTS.DELETED, item);
+      }
+      setError(undefined);
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Failed to delete resolved comments",
+      );
+    }
+  }, [resolvedCount]);
+
   useEffect(() => {
     void loadComments();
     void loadReview();
@@ -570,6 +614,16 @@ const Panel = () => {
             type="button"
           >
             Complete review
+          </button>
+          <button
+            disabled={resolvedCount === 0}
+            onClick={() => void deleteResolvedComments()}
+            style={styles.dangerButton}
+            title="Delete every resolved comment across all stories"
+            type="button"
+          >
+            <TrashIcon style={styles.buttonIcon} />
+            Delete resolved ({resolvedCount})
           </button>
           <button
             onClick={() => {
