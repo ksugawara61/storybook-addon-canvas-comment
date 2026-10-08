@@ -107,16 +107,15 @@ The agent then moves on to follow-up work (fixes, filing issues, and so on).
 Adding a new comment automatically flips the status back to `reviewing`.
 So the fix → re-review loop works repeatedly.
 
-The review status is stored next to the comments:
-
-```text
-.storybook/canvas-comments/review-status.json
-```
+The review status is stored in the same file as the comments, under `review`:
 
 ```json
 {
-  "status": "reviewing",
-  "updatedAt": "2026-06-27T00:00:00.000Z"
+  "comments": [],
+  "review": {
+    "status": "reviewing",
+    "updatedAt": "2026-06-27T00:00:00.000Z"
+  }
 }
 ```
 
@@ -125,7 +124,6 @@ An agent can block until the review completes with the `wait-comments` CLI. On c
 ```bash
 pnpm --filter storybook-addon-canvas-comments wait-comments -- \
   --comments-file path/to/.storybook/canvas-comments/comments.json \
-  --review-status-file path/to/.storybook/canvas-comments/review-status.json \
   --include-dom-tree
 ```
 
@@ -258,7 +256,7 @@ The requests pass straight through to the dev-server middleware.
 ## `dom-map` CLI
 
 You can emit JSON for the saved comments with the `dom-map` CLI.
-It reads `comments.json` from disk.
+It reads `comments.json` from disk, or the hosted API with `--api-url`.
 It pairs each comment with the DOM snapshot saved when the comment was created.
 It needs neither a browser nor a running Storybook:
 
@@ -299,45 +297,53 @@ pnpm --filter storybook-addon-canvas-comments reply -- \
 
 - `--author <agent|reviewer>` — who wrote the reply. Defaults to `agent`.
 - `--resolve` — also mark the comment `resolved`. Without it, the status is unchanged.
-- `--comments-file <path>` / `--review-status-file <path>` — override the default storage paths.
+- `--comments-file <path>` — override the default storage path.
+- `--api-url <url>` — reply through the hosted API instead of a local file.
 
 The `dom-map` and `wait-comments` output includes each comment's `replies`.
 So the agent can read the earlier thread before it acts on a comment.
 
 ## JSON schema
 
-Comments are stored as a JSON array, designed to be read by AI agents:
+Comments and the review status are stored in one JSON object, designed to be read by AI agents.
+A file that only holds a comment array, from older versions, is still read:
 
 ```json
-[
-  {
-    "id": "42f3dcbf-4e8d-49e4-86c4-7a61a62b7e70",
-    "storyId": "example-button--primary",
-    "storyTitle": "Example/Button",
-    "storyName": "Primary",
-    "note": "Increase the padding around this button",
-    "selector": "[data-ai-source=\"src/components/Button.tsx:42\"]",
-    "dataTestId": "submit-button",
-    "dataAiComponent": "SubmitButton",
-    "dataAiSource": "src/components/Button.tsx:42",
-    "rect": {
-      "x": 24,
-      "y": 120,
-      "width": 160,
-      "height": 44
-    },
-    "pointer": {
-      "x": 84,
-      "y": 138
-    },
-    "viewport": {
-      "width": 390,
-      "height": 844
-    },
-    "createdAt": "2026-06-12T00:00:00.000Z",
-    "status": "open"
+{
+  "comments": [
+    {
+      "id": "42f3dcbf-4e8d-49e4-86c4-7a61a62b7e70",
+      "storyId": "example-button--primary",
+      "storyTitle": "Example/Button",
+      "storyName": "Primary",
+      "note": "Increase the padding around this button",
+      "selector": "[data-ai-source=\"src/components/Button.tsx:42\"]",
+      "dataTestId": "submit-button",
+      "dataAiComponent": "SubmitButton",
+      "dataAiSource": "src/components/Button.tsx:42",
+      "rect": {
+        "x": 24,
+        "y": 120,
+        "width": 160,
+        "height": 44
+      },
+      "pointer": {
+        "x": 84,
+        "y": 138
+      },
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "createdAt": "2026-06-12T00:00:00.000Z",
+      "status": "open"
+    }
+  ],
+  "review": {
+    "status": "reviewing",
+    "updatedAt": null
   }
-]
+}
 ```
 
 Each comment may also carry a `domContext` object.
@@ -347,24 +353,36 @@ A comment with replies also carries `replies`, oldest first.
 Each reply has `id`, `author` (`reviewer` or `agent`), `body`, and `createdAt`.
 The stored `selector` is built with the priority described in [Selector strategy](#selector-strategy).
 
-## Hosted mode (Cloudflare Pages + Turso)
+## Hosted mode (Cloudflare Pages + R2)
 
 By default comments are stored on the local filesystem via the dev-server middleware.
 A statically built Storybook may be deployed to Cloudflare Pages.
 For that case, the `src/cloudflare/` directory provides Pages Functions.
-They store comments in a Turso (libSQL) database instead:
+They store comments in a Cloudflare R2 bucket instead:
 
-- `src/cloudflare/functions/api/canvas-comments/` — Pages Functions implementing these routes
-  - `GET/POST /api/canvas-comments`
-  - `DELETE /api/canvas-comments?status=resolved`
-  - `PATCH/DELETE /api/canvas-comments/:id`
-  - `POST /api/canvas-comments/:id/replies`
-  - `GET/POST /api/canvas-comments/review`
-- `src/cloudflare/schema.sql` — the table definitions
-  - `canvas_comments`, `canvas_comment_replies`, and `review_state`
-  - Every statement uses `IF NOT EXISTS`, so re-run it on an existing database to add the replies table
+- `src/cloudflare/functions/api/canvas-comments/[app]/` — Pages Functions implementing these routes
+  - `GET/POST /api/canvas-comments/<app>/comments`
+  - `DELETE /api/canvas-comments/<app>/comments?status=resolved`
+  - `PATCH/DELETE /api/canvas-comments/<app>/comments/:id`
+  - `POST /api/canvas-comments/<app>/comments/:id/replies`
+  - `GET/POST /api/canvas-comments/<app>/review`
 - `src/cloudflare/wrangler.example.toml` — example Pages configuration
-  - Set `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` as environment variables
+  - Bind an R2 bucket as `CANVAS_COMMENTS_BUCKET`
+
+The Functions import files from outside `src/cloudflare/`.
+They are `src/comment-schema.ts`, `src/review-schema.ts`, `src/types.ts` and `src/storage/*`.
+Keep the whole `src/` tree beside it and run `wrangler pages deploy` from `src/cloudflare`.
+Copying only `src/cloudflare/` is not enough.
+
+Each app is stored as one R2 object, `<app>/comments.json`.
+It has the same `{ "comments": [...], "review": {...} }` format as the local file.
+Writes are conditional on the object's etag.
+If another writer changed the object in the meantime, the function re-reads it and retries.
+So concurrent writes do not lose comments.
+
+One Pages project can serve several apps, such as separate Storybooks for different apps.
+Pick the app with the `<app>` path segment.
+It may only contain letters, digits, `-` and `_`.
 
 Point the addon at the hosted API via the preset options:
 
@@ -373,16 +391,28 @@ const config: StorybookConfig = {
   addons: [
     {
       name: "storybook-addon-canvas-comments",
-      options: { apiUrl: "/api/canvas-comments" },
+      options: { apiUrl: "/api/canvas-comments/<app>/comments" },
     },
   ],
 };
 ```
 
-Note: the hosted functions persist the review status in the `review_state` table.
-So the review-status API works in hosted mode with the same JSON shape as the dev server.
-The `wait-comments` CLI reads the review status file directly.
-So the agent-blocking flow still requires a local dev server.
+The API has no authentication of its own.
+Anyone who can reach it can read, write, and delete comments.
+Put the Pages project behind [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) so only reviewers can use it.
+
+The review status API works in hosted mode with the same JSON shape as the dev server.
+The `dom-map`, `reply`, and `wait-comments` CLIs take `--api-url`.
+It makes them use the hosted API instead of a local file:
+
+```bash
+pnpm --filter storybook-addon-canvas-comments wait-comments -- \
+  --api-url https://your-storybook.pages.dev/api/canvas-comments/<app>/comments
+```
+
+The CLI sends no credentials.
+If Cloudflare Access protects the site, the CLI cannot call it as is.
+Allow the caller with a bypass policy first.
 
 ## Contributing
 

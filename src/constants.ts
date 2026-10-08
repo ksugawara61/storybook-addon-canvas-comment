@@ -13,8 +13,6 @@ export const API_HEADERS = {
   accept: "application/json, msw/passthrough",
 };
 export const STORAGE_RELATIVE_PATH = ".storybook/canvas-comments/comments.json";
-export const REVIEW_STORAGE_RELATIVE_PATH =
-  ".storybook/canvas-comments/review-status.json";
 
 export const EVENTS = {
   CREATED: `${ADDON_ID}/created`,
@@ -33,8 +31,14 @@ export const getApiPath = (): string => {
     return __CANVAS_COMMENTS_API_URL__;
   }
   // manager frame: injected via env preset hook as process.env.*
-  if (typeof process !== "undefined" && process.env.CANVAS_COMMENTS_API_URL) {
-    return process.env.CANVAS_COMMENTS_API_URL;
+  // The bundler replaces the expression, but the manager page has no global `process`.
+  try {
+    const url = process.env.CANVAS_COMMENTS_API_URL;
+    if (url) {
+      return url;
+    }
+  } catch {
+    // process is not defined
   }
   return API_PATH;
 };

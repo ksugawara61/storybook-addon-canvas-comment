@@ -1,10 +1,11 @@
-import { resolve } from "node:path";
-import { REVIEW_STORAGE_RELATIVE_PATH } from "../constants.ts";
 import {
   type CanvasCommentDomMapStatus,
   createCanvasCommentDomMap,
 } from "../dom-map.ts";
+import { ApiClient } from "../storage/api-client.ts";
+import { resolveCommentsFile } from "../storage/fs-adapter.ts";
 import { FsReviewStore } from "../storage/review-store.ts";
+import type { ReviewState, ReviewStatus } from "../types.ts";
 
 const HELP = `Usage:
   pnpm --filter storybook-addon-canvas-comments wait-comments -- [options]
@@ -15,11 +16,10 @@ coding agent that started Storybook and wants to detect when review is complete
 before moving on to follow-up work.
 
 Options:
-  --review-status-file <path> Path to review-status.json. Defaults to
-                              .storybook/canvas-comments/review-status.json relative
-                              to the current working directory.
-  --comments-file <path>      Path to comments.json passed to the dom-map.
-                              Defaults to .storybook/canvas-comments/comments.json
+  --api-url <url>             Watch a hosted comments API instead of a local file,
+                              e.g. https://example.pages.dev/api/canvas-comments/curio/comments.
+  --comments-file <path>      Path to comments.json, which holds the review status
+                              too. Defaults to .storybook/canvas-comments/comments.json
                               relative to the current working directory.
   --poll-interval-ms <ms>     Poll interval while waiting. Defaults to 2000.
   --timeout-ms <ms>           Give up after this long (exit 1). Defaults to 0
@@ -35,7 +35,7 @@ Options:
 `;
 
 type WaitOptions = {
-  reviewStatusFile?: string;
+  apiUrl?: string;
   commentsFile?: string;
   pollIntervalMs: number;
   timeoutMs: number;
@@ -95,14 +95,14 @@ const FLAG_OPTION_READERS = {
 } satisfies Record<string, (options: WaitOptions) => void>;
 
 const VALUE_OPTION_READERS = {
+  "--api-url": (options: WaitOptions, value: string) => {
+    options.apiUrl = value;
+  },
   "--comments-file": (options: WaitOptions, value: string) => {
     options.commentsFile = value;
   },
   "--poll-interval-ms": (options: WaitOptions, value: string) => {
     options.pollIntervalMs = parsePositiveInteger(value, "--poll-interval-ms");
-  },
-  "--review-status-file": (options: WaitOptions, value: string) => {
-    options.reviewStatusFile = value;
   },
   "--status": (options: WaitOptions, value: string) => {
     options.status = parseStatus(value);
@@ -169,11 +169,31 @@ const delay = (ms: number) =>
     setTimeout(resolveDelay, ms);
   });
 
+type ReviewSource = {
+  read(): Promise<ReviewState>;
+  write(status: ReviewStatus): Promise<ReviewState>;
+};
+
+const createReviewSource = (
+  options: WaitOptions,
+): { location: string; store: ReviewSource } => {
+  if (options.apiUrl) {
+    const client = new ApiClient(options.apiUrl);
+    return {
+      location: options.apiUrl,
+      store: {
+        read: () => client.readReview(),
+        write: (status) => client.writeReview(status),
+      },
+    };
+  }
+
+  const commentsFile = resolveCommentsFile(options.commentsFile);
+  return { location: commentsFile, store: new FsReviewStore(commentsFile) };
+};
+
 const waitForCompletion = async (options: WaitOptions) => {
-  const reviewStatusFile =
-    options.reviewStatusFile ??
-    resolve(process.cwd(), REVIEW_STORAGE_RELATIVE_PATH);
-  const store = new FsReviewStore(reviewStatusFile);
+  const { location, store } = createReviewSource(options);
 
   if (options.reset) {
     await store.write("reviewing");
@@ -181,7 +201,7 @@ const waitForCompletion = async (options: WaitOptions) => {
 
   const startedAt = Date.now();
   process.stderr.write(
-    `Waiting for review completion (polling ${reviewStatusFile} every ${options.pollIntervalMs}ms)...\n`,
+    `Waiting for review completion (polling ${location} every ${options.pollIntervalMs}ms)...\n`,
   );
 
   while (true) {
@@ -213,6 +233,7 @@ const main = async () => {
   await waitForCompletion(options);
 
   const result = await createCanvasCommentDomMap({
+    apiUrl: options.apiUrl,
     commentsFile: options.commentsFile,
     includeDomTree: options.includeDomTree,
     status: options.status,

@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { replyToCanvasComment } from "./reply-comment";
 import { FsReviewStore } from "./storage/review-store";
 import type { CanvasComment } from "./types";
@@ -24,17 +24,24 @@ const COMMENT: CanvasComment = {
 describe("replyToCanvasComment", () => {
   let dir: string;
   let commentsFile: string;
-  let reviewStatusFile: string;
 
   const readComments = async () =>
-    JSON.parse(await fs.readFile(commentsFile, "utf8")) as CanvasComment[];
+    (
+      JSON.parse(await fs.readFile(commentsFile, "utf8")) as {
+        comments: CanvasComment[];
+      }
+    ).comments;
 
   beforeEach(async () => {
     dir = await fs.mkdtemp(join(tmpdir(), "reply-comment-"));
     commentsFile = join(dir, "comments.json");
-    reviewStatusFile = join(dir, "review-status.json");
-    await fs.writeFile(commentsFile, JSON.stringify([COMMENT]));
-    await new FsReviewStore(reviewStatusFile).write("completed");
+    await fs.writeFile(
+      commentsFile,
+      JSON.stringify({
+        comments: [COMMENT],
+        review: { status: "completed", updatedAt: "2026-06-12T00:00:00.000Z" },
+      }),
+    );
   });
 
   afterEach(async () => {
@@ -46,7 +53,6 @@ describe("replyToCanvasComment", () => {
       body: "  Increased the padding to 16px  ",
       commentId: "comment-1",
       commentsFile,
-      reviewStatusFile,
     });
 
     const [saved] = await readComments();
@@ -57,7 +63,7 @@ describe("replyToCanvasComment", () => {
         body: "Increased the padding to 16px",
       }),
     ]);
-    expect((await new FsReviewStore(reviewStatusFile).read()).status).toBe(
+    expect((await new FsReviewStore(commentsFile).read()).status).toBe(
       "completed",
     );
   });
@@ -83,10 +89,9 @@ describe("replyToCanvasComment", () => {
       body: "Still too tight",
       commentId: "comment-1",
       commentsFile,
-      reviewStatusFile,
     });
 
-    expect((await new FsReviewStore(reviewStatusFile).read()).status).toBe(
+    expect((await new FsReviewStore(commentsFile).read()).status).toBe(
       "reviewing",
     );
   });
@@ -110,5 +115,88 @@ describe("replyToCanvasComment", () => {
         commentsFile,
       }),
     ).rejects.toThrow('Canvas comment "missing" not found.');
+  });
+});
+
+describe("replyToCanvasComment with apiUrl", () => {
+  const API_URL = "https://example.test/api/canvas-comments/curio/comments";
+  const calls: { body: unknown; method: string; url: string }[] = [];
+
+  beforeEach(() => {
+    calls.length = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit) => {
+        calls.push({
+          body: JSON.parse(String(init.body)),
+          method: init.method ?? "GET",
+          url,
+        });
+        return new Response(JSON.stringify({ ...COMMENT, id: "comment-1" }), {
+          status: 201,
+        });
+      }),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it.each([
+    { name: "a trailing slash", url: `${API_URL}/` },
+    { name: "repeated trailing slashes", url: `${API_URL}//` },
+  ])("ignores $name on the API URL", async ({ url }) => {
+    await replyToCanvasComment({
+      apiUrl: url,
+      body: "Fixed",
+      commentId: "comment-1",
+    });
+
+    expect(calls[0]?.url).toBe(`${API_URL}/comment-1/replies`);
+  });
+
+  it.each([
+    { name: "a URL without /comments", url: "https://example.test/api" },
+    {
+      name: "a URL ending in /review",
+      url: "https://example.test/api/canvas-comments/curio/review",
+    },
+  ])("rejects $name", async ({ url }) => {
+    await expect(
+      replyToCanvasComment({ apiUrl: url, body: "Fixed", commentId: "c" }),
+    ).rejects.toThrow("must end with /comments");
+    expect(calls).toEqual([]);
+  });
+
+  it("posts the reply to the hosted API", async () => {
+    await replyToCanvasComment({
+      apiUrl: API_URL,
+      body: " Fixed ",
+      commentId: "comment-1",
+    });
+
+    expect(calls).toEqual([
+      {
+        body: { author: "agent", body: "Fixed" },
+        method: "POST",
+        url: `${API_URL}/comment-1/replies`,
+      },
+    ]);
+  });
+
+  it("also resolves the comment when resolve is set", async () => {
+    await replyToCanvasComment({
+      apiUrl: API_URL,
+      body: "Fixed",
+      commentId: "comment-1",
+      resolve: true,
+    });
+
+    expect(calls.map((call) => [call.method, call.url])).toEqual([
+      ["POST", `${API_URL}/comment-1/replies`],
+      ["PATCH", `${API_URL}/comment-1`],
+    ]);
+    expect(calls[1]?.body).toEqual({ status: "resolved" });
   });
 });

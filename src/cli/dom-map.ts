@@ -11,6 +11,8 @@ Reads comments.json from disk and prints each comment with the DOM snapshot capt
 when it was created. No browser or running Storybook is required.
 
 Options:
+  --api-url <url>             Read from a hosted comments API instead of a local file,
+                              e.g. https://example.pages.dev/api/canvas-comments/curio/comments.
   --comments-file <path>      Path to comments.json. Defaults to
                               .storybook/canvas-comments/comments.json relative to the
                               current working directory.
@@ -43,6 +45,9 @@ const FLAG_OPTION_READERS = {
 } satisfies Record<string, (options: CanvasCommentDomMapOptions) => void>;
 
 const VALUE_OPTION_READERS = {
+  "--api-url": (options: CanvasCommentDomMapOptions, value: string) => {
+    options.apiUrl = value;
+  },
   "--comments-file": (options: CanvasCommentDomMapOptions, value: string) => {
     options.commentsFile = value;
   },

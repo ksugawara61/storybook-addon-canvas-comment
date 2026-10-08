@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+- **Breaking:** hosted mode now stores comments in Cloudflare R2 instead of Turso.
+  Turso support is removed.
+  `@libsql/client`, `schema.sql`, and the `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` variables are gone.
+  Existing Turso data is not migrated.
+  Bind an R2 bucket as `CANVAS_COMMENTS_BUCKET` instead (see `wrangler.example.toml`).
+  Each app keeps `<app>/comments.json` in it, and writes use the etag to retry on conflicts.
+- **Breaking:** the hosted API routes now carry the app name.
+  Use `apiUrl: "/api/canvas-comments/<app>/comments"`.
+  The Pages Functions have no authentication, so protect them with Cloudflare Access.
+- **Breaking:** `comments.json` is now `{ "comments": [...], "review": { "status", "updatedAt" } }`.
+  `review-status.json` is no longer used.
+  The `--review-status-file` option of `reply` and `wait-comments` is removed.
+  The old array-only `comments.json` is still read, and it is rewritten in the new format on the next write.
+- Add `--api-url` to `dom-map`, `reply`, and `wait-comments`.
+  It reads and writes the hosted API instead of a local file.
+- The hosted API now resets the review status to `reviewing` when a comment is created.
+  This matches the dev server.
+- `typecheck` now also checks `src/cloudflare`.
+
 - Delete every resolved comment at once.
   The panel header has a **Delete resolved (N)** button that asks for confirmation first.
   `DELETE /comments?status=resolved` is added to the dev server and the hosted Pages Functions.

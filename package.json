@@ -6,11 +6,11 @@
     "canvas-comments-wait-comments": "./dist/cli/wait-comments.js"
   },
   "dependencies": {
-    "@libsql/client": "catalog:",
     "dom-accessibility-api": "catalog:"
   },
   "description": "Storybook addon for inline UI feedback on the canvas — click to annotate, review in a panel, and hand structured context to coding agents via a filesystem dom-map.",
   "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
     "@storybook/icons": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
@@ -45,7 +45,12 @@
     "LICENSE",
     "dist",
     "README.md",
-    "src/cloudflare"
+    "src/cloudflare",
+    "src/comment-schema.ts",
+    "src/review-schema.ts",
+    "src/storage",
+    "src/types.ts",
+    "!src/**/*.test.ts"
   ],
   "keywords": [
     "storybook-addon",
@@ -68,7 +73,7 @@
     "dom-map": "tsx src/cli/dom-map.ts",
     "reply": "tsx src/cli/reply.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p src/cloudflare/tsconfig.json",
     "wait-comments": "tsx src/cli/wait-comments.ts"
   },
   "storybook": {

@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createCanvasCommentDomMap,
   filterCanvasComments,
@@ -184,9 +184,33 @@ describe("createCanvasCommentDomMap", () => {
     vi.mocked(fs.readFile).mockReset();
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   const mockFile = (comments: CanvasComment[]) => {
     vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(comments) as never);
   };
+
+  it("reads comments from the hosted API when apiUrl is set", async () => {
+    const apiUrl = "https://example.test/api/canvas-comments/curio/comments";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        url === apiUrl
+          ? new Response(JSON.stringify([createComment({ id: "api-comment" })]))
+          : new Response("not found", { status: 404 }),
+      ),
+    );
+    mockFile([createComment({ id: "file-comment" })]);
+
+    const result = await createCanvasCommentDomMap({ apiUrl });
+
+    expect(result.commentsApiUrl).toBe(apiUrl);
+    expect(result.stories[0]?.comments.map((item) => item.comment.id)).toEqual([
+      "api-comment",
+    ]);
+  });
 
   it("maps comment with domContext to matchType:'snapshot' with target", async () => {
     const domContext = createDomContext();

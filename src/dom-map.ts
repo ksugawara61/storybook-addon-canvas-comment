@@ -1,7 +1,6 @@
-import fs from "node:fs/promises";
-import { resolve } from "node:path";
-import { isCanvasComment } from "./comment-schema";
-import { API_PATH, STORAGE_RELATIVE_PATH } from "./constants";
+import { API_PATH } from "./constants";
+import { ApiClient } from "./storage/api-client";
+import { readCommentsFile, resolveCommentsFile } from "./storage/fs-adapter";
 import type {
   CanvasComment,
   CanvasCommentA11yAnchor,
@@ -20,6 +19,8 @@ export type { DomElementSummary, DomTreeNode };
 export type CanvasCommentDomMapStatus = CanvasCommentStatus | "all";
 
 export type CanvasCommentDomMapOptions = {
+  /** Reads from this hosted comments API instead of the local file. */
+  apiUrl?: string;
   commentsFile?: string;
   includeDomTree?: boolean;
   status?: CanvasCommentDomMapStatus;
@@ -67,6 +68,7 @@ export type CanvasCommentDomMap = {
 };
 
 type NormalizedOptions = {
+  apiUrl?: string;
   commentsFile: string;
   includeDomTree: boolean;
   status: CanvasCommentDomMapStatus;
@@ -97,8 +99,8 @@ const normalizeStorybookUrlOption = (value: string | undefined) =>
 const normalizeOptions = (
   options: CanvasCommentDomMapOptions,
 ): NormalizedOptions => ({
-  commentsFile:
-    options.commentsFile ?? resolve(process.cwd(), STORAGE_RELATIVE_PATH),
+  apiUrl: options.apiUrl,
+  commentsFile: resolveCommentsFile(options.commentsFile),
   includeDomTree: options.includeDomTree ?? false,
   status: options.status ?? "open",
   storybookUrl: normalizeStorybookUrlOption(options.storybookUrl),
@@ -137,14 +139,7 @@ const groupCommentsByStory = (comments: CanvasComment[]) => {
 
 export const loadCanvasCommentsFromDisk = async (
   commentsFile: string,
-): Promise<CanvasComment[]> => {
-  try {
-    const raw = JSON.parse(await fs.readFile(commentsFile, "utf8")) as unknown;
-    return Array.isArray(raw) ? raw.filter(isCanvasComment) : [];
-  } catch {
-    return [];
-  }
-};
+): Promise<CanvasComment[]> => (await readCommentsFile(commentsFile)).comments;
 
 const summarizeComment = (
   comment: CanvasComment,
@@ -233,7 +228,9 @@ export const createCanvasCommentDomMap = async (
   options: CanvasCommentDomMapOptions,
 ): Promise<CanvasCommentDomMap> => {
   const normalized = normalizeOptions(options);
-  const all = await loadCanvasCommentsFromDisk(normalized.commentsFile);
+  const all = normalized.apiUrl
+    ? await new ApiClient(normalized.apiUrl).list()
+    : await loadCanvasCommentsFromDisk(normalized.commentsFile);
   const comments = filterCanvasComments(all, {
     status: normalized.status,
     storyId: normalized.storyId,
@@ -248,9 +245,11 @@ export const createCanvasCommentDomMap = async (
   );
 
   return {
-    commentsApiUrl: normalized.storybookUrl
-      ? buildCanvasCommentsApiUrl(normalized.storybookUrl)
-      : "",
+    commentsApiUrl:
+      normalized.apiUrl ??
+      (normalized.storybookUrl
+        ? buildCanvasCommentsApiUrl(normalized.storybookUrl)
+        : ""),
     generatedAt: new Date().toISOString(),
     stories,
     storybookUrl: normalized.storybookUrl,

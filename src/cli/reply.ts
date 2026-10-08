@@ -7,7 +7,7 @@ import type { CanvasCommentReplyAuthor } from "../types.ts";
 const HELP = `Usage:
   pnpm --filter storybook-addon-canvas-comments reply -- --comment-id <id> --body <text> [options]
 
-Appends a reply to a canvas comment in comments.json and prints the updated comment
+Appends a reply to a canvas comment in comments.json (or the hosted API) and prints the updated comment
 as JSON. No browser or running Storybook is required, so a coding agent can explain
 in plain words what it changed for the comment.
 
@@ -20,9 +20,9 @@ Options:
   --comments-file <path>      Path to comments.json. Defaults to
                               .storybook/canvas-comments/comments.json relative to the
                               current working directory.
-  --review-status-file <path> Path to review-status.json, used by reviewer replies.
-                              Defaults to .storybook/canvas-comments/review-status.json
-                              relative to the current working directory.
+  --api-url <url>             Reply through a hosted comments API instead of a local
+                              file, e.g.
+                              https://example.pages.dev/api/canvas-comments/curio/comments.
   --help                      Show this help.
 `;
 
@@ -45,6 +45,9 @@ const FLAG_OPTION_READERS = {
 } satisfies Record<string, (options: ParsedOptions) => void>;
 
 const VALUE_OPTION_READERS = {
+  "--api-url": (options: ParsedOptions, value: string) => {
+    options.apiUrl = value;
+  },
   "--author": (options: ParsedOptions, value: string) => {
     options.author = parseAuthor(value);
   },
@@ -56,9 +59,6 @@ const VALUE_OPTION_READERS = {
   },
   "--comments-file": (options: ParsedOptions, value: string) => {
     options.commentsFile = value;
-  },
-  "--review-status-file": (options: ParsedOptions, value: string) => {
-    options.reviewStatusFile = value;
   },
 } satisfies Record<string, (options: ParsedOptions, value: string) => void>;
 
