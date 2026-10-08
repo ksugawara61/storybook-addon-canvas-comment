@@ -10,7 +10,6 @@
   },
   "description": "Storybook addon for inline UI feedback on the canvas — click to annotate, review in a panel, and hand structured context to coding agents via a filesystem dom-map.",
   "devDependencies": {
-    "@playwright/test": "catalog:",
     "@storybook/icons": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
@@ -59,15 +58,9 @@
   "main": "./dist/index.js",
   "name": "storybook-addon-canvas-comments",
   "peerDependencies": {
-    "@playwright/test": ">=1.40.0",
     "react": ">=18",
     "storybook": ">=8",
     "vite": ">=5"
-  },
-  "peerDependenciesMeta": {
-    "@playwright/test": {
-      "optional": true
-    }
   },
   "scripts": {
     "build": "tsup",

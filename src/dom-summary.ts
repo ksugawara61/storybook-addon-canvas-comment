@@ -1,13 +1,6 @@
 /**
- * Browser-agnostic DOM summarization utilities.
- *
- * This module has NO runtime imports so it can be used from two contexts:
- *   1. Directly imported by preview.ts (runs in the live browser).
- *   2. Bundled as an IIFE via esbuild.transform and injected into a Playwright
- *      page via page.addScriptTag — the entry point is exposed as
- *      `window.__canvasCommentsSummarizeTarget`.
- *
- * Keep this file free of runtime imports. Type-only imports are fine.
+ * Browser-side DOM summarization used by preview.ts to snapshot the annotated
+ * element when a comment is created. The snapshot is what dom-map reads later.
  */
 import type {
   CanvasCommentRect,
@@ -301,18 +294,3 @@ export const summarizeTarget = (
 
   return { domTree, target };
 };
-
-/**
- * IIFE entry point exposed on `window` when this module is injected via
- * page.addScriptTag in Playwright.
- */
-if (
-  typeof window !== "undefined" &&
-  !("__canvasCommentsSummarizeTarget" in window)
-) {
-  (
-    window as unknown as {
-      __canvasCommentsSummarizeTarget: typeof summarizeTarget;
-    }
-  ).__canvasCommentsSummarizeTarget = summarizeTarget;
-}

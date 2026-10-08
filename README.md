@@ -29,7 +29,7 @@ The agent then receives all open comments as structured JSON.
 | Comment pins | Saved comments are shown as pins on the canvas. Hover or focus a pin to read the note and resolve it in place. Toggle pin visibility from the toolbar (eye icon) or the panel header. |
 | Addon panel | A "UI Feedback" panel lists all comments with their selector and metadata. It supports reopen / resolve / delete. |
 | Review-completion signal | A "Complete review" button in the panel flips a review status flag. A waiting coding agent can detect it. |
-| Agent-friendly output | The `dom-map` and `wait-comments` CLIs map each comment to the live DOM. They emit JSON built for LLM consumption. |
+| Agent-friendly output | The `dom-map` and `wait-comments` CLIs pair each comment with its saved DOM snapshot. They emit JSON built for LLM consumption. |
 
 ## Requirements
 
@@ -230,12 +230,14 @@ The requests pass straight through to the dev-server middleware.
 
 ## `dom-map` CLI
 
-While the Storybook dev server is running, you can emit JSON for the saved comments.
-It maps each comment to the actual DOM inside the canvas:
+You can emit JSON for the saved comments with the `dom-map` CLI.
+It reads `comments.json` from disk.
+It pairs each comment with the DOM snapshot saved when the comment was created.
+It needs neither a browser nor a running Storybook:
 
 ```bash
 pnpm --filter storybook-addon-canvas-comments dom-map -- \
-  --storybook-url http://localhost:6006 \
+  --comments-file path/to/.storybook/canvas-comments/comments.json \
   --story-id example-button--primary
 ```
 
@@ -243,34 +245,17 @@ Omitting `--story-id` processes every story that has comments. Only `open` comme
 
 ```bash
 pnpm --filter storybook-addon-canvas-comments dom-map -- \
-  --storybook-url http://localhost:6006 \
   --status all \
-  --viewport 390x844 \
   --include-dom-tree
 ```
 
-The CLI resolves each comment's target in this order:
-
-1. Resolve the accessibility-tree anchor with Playwright's `getByRole` (`matchType: "a11y"`).
-2. If that fails, resolve the stored `selector` with `document.querySelector`.
-3. If that fails, scale the stored pointer from the original viewport to the current one.
-   Then fall back to `document.elementsFromPoint`.
-
-The output includes the stored anchor, the stored coordinates, and the current coordinates.
-It also includes the matched element's tag / attributes / rect / text / ancestors.
-With `--include-dom-tree` a bounded DOM tree is also included.
-The `snapshot` engine keeps only the **subtree rooted at each comment target**.
+The output includes the stored anchor and coordinates.
+It also includes the target element's tag / attributes / rect / text / ancestors.
+Such comments get `matchType: "snapshot"`.
+A comment without a snapshot gets `matchType: "none"` and an `error`.
+With `--include-dom-tree` the subtree rooted at each comment target is also included.
 That keeps the context small for AI agents.
-The `playwright` engine emits the subtree under `#storybook-root`.
-
-Before capturing the DOM, the CLI waits until loading indicators disappear.
-Loading indicators are elements matching any of these:
-
-- `role="progressbar"`
-- `loading` / `spinner` / `skeleton` class or test-id patterns
-- "Loading" text
-
-Pass `--skip-loading-wait` when inspecting a loading-state story itself.
+Pass `--storybook-url` to fill the story URLs in the output.
 
 ## JSON schema
 

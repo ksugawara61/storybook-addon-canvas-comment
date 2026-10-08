@@ -38,7 +38,6 @@ export default defineConfig([
     },
     format: ["esm"],
     outDir: "dist",
-    external: ["@playwright/test"],
     banner: {
       js: "#!/usr/bin/env node",
     },

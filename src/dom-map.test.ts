@@ -4,8 +4,6 @@ import {
   createCanvasCommentDomMap,
   filterCanvasComments,
   loadCanvasCommentsFromDisk,
-  parseViewport,
-  scalePoint,
 } from "./dom-map";
 import type {
   CanvasComment,
@@ -106,48 +104,6 @@ describe("filterCanvasComments", () => {
 });
 
 // ---------------------------------------------------------------------------
-// parseViewport
-// ---------------------------------------------------------------------------
-
-describe("parseViewport", () => {
-  it("parses width and height", () => {
-    expect(parseViewport("390x844")).toEqual({ height: 844, width: 390 });
-  });
-
-  it("rejects invalid values", () => {
-    expect(() => parseViewport("390")).toThrow(
-      'Invalid viewport "390". Expected <width>x<height>.',
-    );
-  });
-});
-
-// ---------------------------------------------------------------------------
-// scalePoint
-// ---------------------------------------------------------------------------
-
-describe("scalePoint", () => {
-  it("scales a stored pointer into the target viewport", () => {
-    expect(
-      scalePoint(
-        { x: 100, y: 200 },
-        { height: 800, width: 400 },
-        { height: 400, width: 200 },
-      ),
-    ).toEqual({ x: 50, y: 100 });
-  });
-
-  it("clamps near the viewport edges", () => {
-    expect(
-      scalePoint(
-        { x: 0, y: 1000 },
-        { height: 1000, width: 1000 },
-        { height: 100, width: 100 },
-      ),
-    ).toEqual({ x: 8, y: 92 });
-  });
-});
-
-// ---------------------------------------------------------------------------
 // loadCanvasCommentsFromDisk
 // ---------------------------------------------------------------------------
 
@@ -220,10 +176,10 @@ describe("loadCanvasCommentsFromDisk", () => {
 });
 
 // ---------------------------------------------------------------------------
-// createCanvasCommentDomMap (snapshot engine)
+// createCanvasCommentDomMap
 // ---------------------------------------------------------------------------
 
-describe("createCanvasCommentDomMap (snapshot engine)", () => {
+describe("createCanvasCommentDomMap", () => {
   beforeEach(() => {
     vi.mocked(fs.readFile).mockReset();
   });
@@ -236,7 +192,7 @@ describe("createCanvasCommentDomMap (snapshot engine)", () => {
     const domContext = createDomContext();
     mockFile([createComment({ domContext })]);
 
-    const result = await createCanvasCommentDomMap({ engine: "snapshot" });
+    const result = await createCanvasCommentDomMap({});
 
     expect(result.stories[0]?.comments[0]).toMatchObject({
       matchType: "snapshot",
@@ -247,14 +203,14 @@ describe("createCanvasCommentDomMap (snapshot engine)", () => {
   it("maps comment without domContext to matchType:'none' with null target and error", async () => {
     mockFile([createComment()]);
 
-    const result = await createCanvasCommentDomMap({ engine: "snapshot" });
+    const result = await createCanvasCommentDomMap({});
 
     expect(result.stories[0]?.comments[0]).toMatchObject({
       matchType: "none",
       target: null,
     });
     expect(result.stories[0]?.comments[0]?.error).toContain(
-      "--engine=playwright",
+      "No DOM snapshot available",
     );
   });
 
@@ -262,10 +218,7 @@ describe("createCanvasCommentDomMap (snapshot engine)", () => {
     const domTree = createDomTree({ commentIds: ["comment-1"] });
     mockFile([createComment({ domContext: createDomContext({ domTree }) })]);
 
-    const result = await createCanvasCommentDomMap({
-      engine: "snapshot",
-      includeDomTree: true,
-    });
+    const result = await createCanvasCommentDomMap({ includeDomTree: true });
 
     expect(result.stories[0]?.domTree).toEqual(domTree);
   });
@@ -273,7 +226,7 @@ describe("createCanvasCommentDomMap (snapshot engine)", () => {
   it("omits domTree when includeDomTree is false", async () => {
     mockFile([createComment({ domContext: createDomContext() })]);
 
-    const result = await createCanvasCommentDomMap({ engine: "snapshot" });
+    const result = await createCanvasCommentDomMap({});
 
     expect(result.stories[0]?.domTree).toBeUndefined();
   });
@@ -282,7 +235,7 @@ describe("createCanvasCommentDomMap (snapshot engine)", () => {
     // Default status is "open"; resolved comment should be excluded.
     mockFile([createComment({ status: "resolved" })]);
 
-    const result = await createCanvasCommentDomMap({ engine: "snapshot" });
+    const result = await createCanvasCommentDomMap({});
 
     expect(result.stories).toHaveLength(0);
   });
@@ -291,7 +244,7 @@ describe("createCanvasCommentDomMap (snapshot engine)", () => {
     const viewport = { height: 1200, width: 600 };
     mockFile([createComment({ domContext: createDomContext({ viewport }) })]);
 
-    const result = await createCanvasCommentDomMap({ engine: "snapshot" });
+    const result = await createCanvasCommentDomMap({});
 
     expect(result.stories[0]?.viewport).toEqual(viewport);
   });

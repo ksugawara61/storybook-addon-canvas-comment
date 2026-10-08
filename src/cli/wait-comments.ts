@@ -10,7 +10,7 @@ const HELP = `Usage:
   pnpm --filter storybook-addon-canvas-comments wait-comments -- [options]
 
 Blocks until the user clicks "Complete review" in the Storybook UI, then prints the
-open canvas comments (snapshot dom-map JSON) to stdout and exits. Designed for a
+open canvas comments (dom-map JSON) to stdout and exits. Designed for a
 coding agent that started Storybook and wants to detect when review is complete
 before moving on to follow-up work.
 
@@ -18,7 +18,7 @@ Options:
   --review-status-file <path> Path to review-status.json. Defaults to
                               .storybook/canvas-comments/review-status.json relative
                               to the current working directory.
-  --comments-file <path>      Path to comments.json passed to the snapshot dom-map.
+  --comments-file <path>      Path to comments.json passed to the dom-map.
                               Defaults to .storybook/canvas-comments/comments.json
                               relative to the current working directory.
   --poll-interval-ms <ms>     Poll interval while waiting. Defaults to 2000.
@@ -214,7 +214,6 @@ const main = async () => {
 
   const result = await createCanvasCommentDomMap({
     commentsFile: options.commentsFile,
-    engine: "snapshot",
     includeDomTree: options.includeDomTree,
     status: options.status,
     storyId: options.storyId,

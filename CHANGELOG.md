@@ -5,7 +5,11 @@
 - Anchor comments to the accessibility tree via `domContext.a11yAnchor`.
   The anchor holds the role, the accessible name, and named ancestors.
 - Canvas pins follow their anchored element on resize, scroll, and DOM changes.
-- `dom-map` resolves the accessibility-tree anchor first and reports `matchType: "a11y"`.
+- Remove the Playwright engine from `dom-map`.
+  It now reads only the DOM snapshot saved with each comment.
+  The `--engine` and `--viewport` options are gone.
+  So are `--timeout-ms`, `--skip-loading-wait`, and the `--max-*` options.
+  `@playwright/test` is no longer a peer dependency.
 
 ## 0.1.0
 
