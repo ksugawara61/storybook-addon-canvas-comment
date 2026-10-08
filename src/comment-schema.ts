@@ -1,10 +1,20 @@
-import type { CanvasComment, CanvasCommentStatus } from "./types";
+import type {
+  CanvasComment,
+  CanvasCommentReply,
+  CanvasCommentReplyAuthor,
+  CanvasCommentStatus,
+} from "./types";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
 const isCanvasCommentStatus = (value: unknown): value is CanvasCommentStatus =>
   value === "open" || value === "resolved";
+
+const isCanvasCommentReplyAuthor = (
+  value: unknown,
+): value is CanvasCommentReplyAuthor =>
+  value === "reviewer" || value === "agent";
 
 const isOptionalString = (value: unknown) =>
   value === undefined || typeof value === "string";
@@ -58,6 +68,18 @@ const isOptionalDomContext = (
   );
 };
 
+const isCanvasCommentReply = (value: unknown): value is CanvasCommentReply =>
+  isRecord(value) &&
+  typeof value.id === "string" &&
+  isCanvasCommentReplyAuthor(value.author) &&
+  typeof value.body === "string" &&
+  typeof value.createdAt === "string";
+
+// Comments saved before replies existed have no `replies` field.
+const isOptionalReplies = (value: unknown) =>
+  value === undefined ||
+  (Array.isArray(value) && value.every(isCanvasCommentReply));
+
 export const isCanvasComment = (value: unknown): value is CanvasComment => {
   if (!isRecord(value)) {
     return false;
@@ -78,7 +100,8 @@ export const isCanvasComment = (value: unknown): value is CanvasComment => {
     isViewport(value.viewport) &&
     typeof value.createdAt === "string" &&
     isCanvasCommentStatus(value.status) &&
-    isOptionalDomContext(value.domContext)
+    isOptionalDomContext(value.domContext) &&
+    isOptionalReplies(value.replies)
   );
 };
 
@@ -91,3 +114,34 @@ export const readCanvasCommentStatus = (
 
   return isCanvasCommentStatus(value.status) ? value.status : undefined;
 };
+
+export type CanvasCommentReplyInput = Pick<
+  CanvasCommentReply,
+  "author" | "body"
+>;
+
+/** Reads a reply request payload. The body is trimmed and must not be empty. */
+export const readCanvasCommentReplyInput = (
+  value: unknown,
+): CanvasCommentReplyInput | undefined => {
+  if (
+    !isRecord(value) ||
+    !isCanvasCommentReplyAuthor(value.author) ||
+    typeof value.body !== "string"
+  ) {
+    return undefined;
+  }
+
+  const body = value.body.trim();
+
+  return body ? { author: value.author, body } : undefined;
+};
+
+export const createCanvasCommentReply = (
+  input: CanvasCommentReplyInput,
+): CanvasCommentReply => ({
+  author: input.author,
+  body: input.body,
+  createdAt: new Date().toISOString(),
+  id: crypto.randomUUID(),
+});

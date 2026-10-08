@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Add reply threads to comments.
+  Reviewers reply from the panel, and coding agents reply with the new `reply` CLI.
+  Each reply records whether a reviewer or an agent wrote it.
+  `POST /comments/:id/replies` is added to the dev server and the hosted Pages Functions.
+  Hosted mode stores replies in the new `canvas_comment_replies` table.
+  Re-run `schema.sql` to add it.
+- `dom-map` and `wait-comments` include each comment's `replies`.
+
 - Anchor comments to the accessibility tree via `domContext.a11yAnchor`.
   The anchor holds the role, the accessible name, and named ancestors.
 - Canvas pins follow their anchored element on resize, scroll, and DOM changes.

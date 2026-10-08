@@ -79,6 +79,15 @@ export type CanvasCommentDomContext = {
   viewport: CanvasCommentViewport;
 };
 
+export type CanvasCommentReplyAuthor = "reviewer" | "agent";
+
+export type CanvasCommentReply = {
+  id: string;
+  author: CanvasCommentReplyAuthor;
+  body: string;
+  createdAt: string;
+};
+
 export type CanvasComment = {
   id: string;
   storyId: string;
@@ -95,4 +104,6 @@ export type CanvasComment = {
   createdAt: string;
   status: CanvasCommentStatus;
   domContext?: CanvasCommentDomContext;
+  /** Thread of replies under the comment, oldest first. */
+  replies?: CanvasCommentReply[];
 };

@@ -19,6 +19,16 @@ CREATE TABLE IF NOT EXISTS canvas_comments (
 CREATE INDEX IF NOT EXISTS idx_canvas_comments_story_id ON canvas_comments (story_id);
 CREATE INDEX IF NOT EXISTS idx_canvas_comments_status ON canvas_comments (status);
 
+CREATE TABLE IF NOT EXISTS canvas_comment_replies (
+  id TEXT PRIMARY KEY NOT NULL,
+  comment_id TEXT NOT NULL,
+  author TEXT NOT NULL,
+  body TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_canvas_comment_replies_comment_id ON canvas_comment_replies (comment_id);
+
 CREATE TABLE IF NOT EXISTS review_state (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   status TEXT NOT NULL DEFAULT 'reviewing',

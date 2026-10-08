@@ -28,6 +28,8 @@ import {
 import type {
   CanvasComment,
   CanvasCommentA11yAnchor,
+  CanvasCommentReply,
+  CanvasCommentReplyAuthor,
   CanvasCommentStatus,
   ReviewState,
   ReviewStatus,
@@ -118,6 +120,55 @@ const styles = {
     margin: "8px 0",
     whiteSpace: "pre-wrap",
   },
+  replyAuthor: {
+    borderRadius: 999,
+    fontSize: 10,
+    fontWeight: 700,
+    padding: "1px 6px",
+    textTransform: "uppercase",
+  },
+  replyBody: {
+    lineHeight: 1.5,
+    margin: "4px 0 0",
+    whiteSpace: "pre-wrap",
+  },
+  replyForm: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+    marginTop: 10,
+  },
+  replyHeader: {
+    alignItems: "center",
+    display: "flex",
+    fontSize: 11,
+    gap: 6,
+  },
+  replyInput: {
+    background: "transparent",
+    border: "1px solid rgba(128, 128, 128, 0.35)",
+    borderRadius: 4,
+    color: "inherit",
+    font: "12px system-ui",
+    minHeight: 48,
+    padding: 6,
+    resize: "vertical",
+  },
+  replyItem: {
+    borderLeft: "2px solid rgba(128, 128, 128, 0.35)",
+    padding: "4px 0 4px 10px",
+  },
+  replyList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+    listStyle: "none",
+    margin: "10px 0 0",
+    padding: 0,
+  },
+  replyMeta: {
+    opacity: 0.68,
+  },
   root: {
     color: "inherit",
     font: "13px system-ui",
@@ -178,6 +229,15 @@ const statusStyle = (status: CanvasCommentStatus) => ({
   color: status === "open" ? "#6f4e00" : "#166534",
 });
 
+const replyAuthorStyle = (author: CanvasCommentReplyAuthor) => ({
+  ...styles.replyAuthor,
+  background: author === "agent" ? "#ede9fe" : "#e0f2fe",
+  color: author === "agent" ? "#5b21b6" : "#075985",
+});
+
+const replyAuthorLabel = (author: CanvasCommentReplyAuthor) =>
+  author === "agent" ? "Agent" : "Reviewer";
+
 const reviewStatusStyle = (status: ReviewStatus) => ({
   ...styles.status,
   background: status === "completed" ? "#e5f7ed" : "#e7eefc",
@@ -219,12 +279,68 @@ const OverlayTool = () => {
   );
 };
 
+const ReplyThread = ({
+  draft = "",
+  onDraftChange,
+  onSubmit,
+  replies = [],
+}: {
+  draft?: string;
+  onDraftChange: (value: string) => void;
+  onSubmit: (body: string) => void;
+  replies?: CanvasCommentReply[];
+}) => (
+  <>
+    {replies.length > 0 ? (
+      <ul aria-label="Replies" style={styles.replyList}>
+        {replies.map((reply) => (
+          <li key={reply.id} style={styles.replyItem}>
+            <div style={styles.replyHeader}>
+              <span style={replyAuthorStyle(reply.author)}>
+                {replyAuthorLabel(reply.author)}
+              </span>
+              <span style={styles.replyMeta}>
+                {formatDate(reply.createdAt)}
+              </span>
+            </div>
+            <p style={styles.replyBody}>{reply.body}</p>
+          </li>
+        ))}
+      </ul>
+    ) : null}
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        const body = draft.trim();
+        if (body) {
+          onSubmit(body);
+        }
+      }}
+      style={styles.replyForm}
+    >
+      <textarea
+        aria-label="Reply"
+        onChange={(event) => onDraftChange(event.target.value)}
+        placeholder="Reply to this feedback"
+        style={styles.replyInput}
+        value={draft}
+      />
+      <div style={styles.actions}>
+        <button disabled={!draft.trim()} style={styles.button} type="submit">
+          Reply
+        </button>
+      </div>
+    </form>
+  </>
+);
+
 const Panel = () => {
   const api = useStorybookApi();
   const [globals, updateGlobals] = useGlobals();
   const [items, setItems] = useState<CanvasComment[]>([]);
   const [error, setError] = useState<string | undefined>();
   const [reviewStatus, setReviewStatus] = useState<ReviewStatus>("reviewing");
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const pinsVisible = globals[COMMENTS_VISIBLE_PARAM_KEY] !== false;
 
   const loadReview = useCallback(async () => {
@@ -330,6 +446,39 @@ const Panel = () => {
     },
     [],
   );
+
+  const addReply = useCallback(async (id: string, body: string) => {
+    try {
+      const response = await fetch(
+        `${getApiPath()}/${encodeURIComponent(id)}/replies`,
+        {
+          body: JSON.stringify({ author: "reviewer", body }),
+          headers: { ...API_HEADERS, "content-type": "application/json" },
+          method: "POST",
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to add reply: ${response.status}`);
+      }
+
+      const updated = (await response.json()) as CanvasComment;
+      setItems((prev) =>
+        prev.map((item) => (item.id === updated.id ? updated : item)),
+      );
+      setReplyDrafts((prev) => ({ ...prev, [id]: "" }));
+      // A reviewer reply re-arms the server to reviewing, so sync the UI.
+      setReviewStatus("reviewing");
+      addons.getChannel().emit(EVENTS.UPDATED, updated);
+      setError(undefined);
+    } catch (replyError) {
+      setError(
+        replyError instanceof Error
+          ? replyError.message
+          : "Failed to add reply",
+      );
+    }
+  }, []);
 
   const deleteComment = useCallback(async (item: CanvasComment) => {
     const confirmed = window.confirm(
@@ -486,6 +635,14 @@ const Panel = () => {
               <dt style={styles.metaLabel}>created</dt>
               <dd style={styles.metaValue}>{formatDate(item.createdAt)}</dd>
             </dl>
+            <ReplyThread
+              draft={replyDrafts[item.id]}
+              onDraftChange={(value) =>
+                setReplyDrafts((prev) => ({ ...prev, [item.id]: value }))
+              }
+              onSubmit={(body) => void addReply(item.id, body)}
+              replies={item.replies}
+            />
             <div style={styles.actions}>
               <button
                 disabled={item.status === "open"}

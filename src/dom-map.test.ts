@@ -240,6 +240,25 @@ describe("createCanvasCommentDomMap", () => {
     expect(result.stories).toHaveLength(0);
   });
 
+  it("includes each comment's replies so agents can read the thread", async () => {
+    const reply = {
+      author: "agent" as const,
+      body: "Increased the padding to 16px",
+      createdAt: "2026-06-13T00:00:00.000Z",
+      id: "reply-1",
+    };
+    mockFile([
+      createComment({ replies: [reply] }),
+      createComment({ id: "c2" }),
+    ]);
+
+    const result = await createCanvasCommentDomMap({});
+
+    expect(
+      result.stories[0]?.comments.map((item) => item.comment.replies),
+    ).toEqual([[reply], []]);
+  });
+
   it("uses domContext viewport as the story viewport", async () => {
     const viewport = { height: 1200, width: 600 };
     mockFile([createComment({ domContext: createDomContext({ viewport }) })]);

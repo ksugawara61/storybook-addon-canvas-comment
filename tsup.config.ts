@@ -34,6 +34,7 @@ export default defineConfig([
   {
     entry: {
       "cli/dom-map": "src/cli/dom-map.ts",
+      "cli/reply": "src/cli/reply.ts",
       "cli/wait-comments": "src/cli/wait-comments.ts",
     },
     format: ["esm"],

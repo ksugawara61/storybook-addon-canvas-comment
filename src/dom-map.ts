@@ -8,6 +8,7 @@ import type {
   CanvasCommentDomContext,
   CanvasCommentPoint,
   CanvasCommentRect,
+  CanvasCommentReply,
   CanvasCommentStatus,
   CanvasCommentViewport,
   DomElementSummary,
@@ -36,6 +37,8 @@ export type CanvasCommentDomMapItem = {
     dataTestId?: string;
     id: string;
     note: string;
+    /** Replies under the comment, oldest first. Empty when there are none. */
+    replies: CanvasCommentReply[];
     selector: string;
     status: CanvasCommentStatus;
     storedPointer: CanvasCommentPoint;
@@ -143,6 +146,24 @@ export const loadCanvasCommentsFromDisk = async (
   }
 };
 
+const summarizeComment = (
+  comment: CanvasComment,
+): CanvasCommentDomMapItem["comment"] => ({
+  a11yAnchor: comment.domContext?.a11yAnchor,
+  createdAt: comment.createdAt,
+  currentPointer: comment.pointer,
+  dataAiComponent: comment.dataAiComponent,
+  dataAiSource: comment.dataAiSource,
+  dataTestId: comment.dataTestId,
+  id: comment.id,
+  note: comment.note,
+  replies: comment.replies ?? [],
+  selector: comment.selector,
+  status: comment.status,
+  storedPointer: comment.pointer,
+  storedRect: comment.rect,
+});
+
 const buildCommentItemFromSnapshot = (
   comment: CanvasComment,
 ): CanvasCommentDomMapItem => {
@@ -150,20 +171,7 @@ const buildCommentItemFromSnapshot = (
 
   if (!domContext) {
     return {
-      comment: {
-        a11yAnchor: comment.domContext?.a11yAnchor,
-        createdAt: comment.createdAt,
-        currentPointer: comment.pointer,
-        dataAiComponent: comment.dataAiComponent,
-        dataAiSource: comment.dataAiSource,
-        dataTestId: comment.dataTestId,
-        id: comment.id,
-        note: comment.note,
-        selector: comment.selector,
-        status: comment.status,
-        storedPointer: comment.pointer,
-        storedRect: comment.rect,
-      },
+      comment: summarizeComment(comment),
       error: "No DOM snapshot available. Re-create the comment to capture one.",
       matchType: "none",
       target: null,
@@ -171,20 +179,7 @@ const buildCommentItemFromSnapshot = (
   }
 
   return {
-    comment: {
-      a11yAnchor: comment.domContext?.a11yAnchor,
-      createdAt: comment.createdAt,
-      currentPointer: comment.pointer,
-      dataAiComponent: comment.dataAiComponent,
-      dataAiSource: comment.dataAiSource,
-      dataTestId: comment.dataTestId,
-      id: comment.id,
-      note: comment.note,
-      selector: comment.selector,
-      status: comment.status,
-      storedPointer: comment.pointer,
-      storedRect: comment.rect,
-    },
+    comment: summarizeComment(comment),
     matchType: "snapshot",
     target: domContext.target,
   };

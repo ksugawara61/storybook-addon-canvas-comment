@@ -1,7 +1,12 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { fileURLToPath } from "node:url";
 import { mergeConfig, type Plugin, type UserConfig } from "vite";
-import { isCanvasComment, readCanvasCommentStatus } from "./comment-schema.ts";
+import {
+  createCanvasCommentReply,
+  isCanvasComment,
+  readCanvasCommentReplyInput,
+  readCanvasCommentStatus,
+} from "./comment-schema.ts";
 import { API_PATH, BASE_API_PATH, REVIEW_API_PATH } from "./constants.ts";
 import { readReviewStatus } from "./review-schema.ts";
 import { FsAdapter } from "./storage/fs-adapter.ts";
@@ -121,6 +126,40 @@ const handleReviewRequest = async (
   json(res, 200, await reviewStore.write(nextStatus));
 };
 
+const handleReplyRequest = async (
+  req: IncomingMessage,
+  res: ServerResponse,
+  id: string,
+  adapter: StorageAdapter,
+  reviewStore: FsReviewStore,
+) => {
+  if (req.method !== "POST") {
+    json(res, 405, { error: "Method not allowed" });
+    return;
+  }
+
+  const input = readCanvasCommentReplyInput(await readBody(req));
+
+  if (!id || !input) {
+    json(res, 400, { error: "Invalid canvas comment reply payload" });
+    return;
+  }
+
+  const updated = await adapter.addReply(id, createCanvasCommentReply(input));
+
+  if (!updated) {
+    json(res, 404, { error: "Canvas comment not found" });
+    return;
+  }
+
+  // A reviewer reply is new feedback, so it re-arms the review like a new comment.
+  if (input.author === "reviewer") {
+    await reviewStore.write("reviewing");
+  }
+
+  json(res, 201, updated);
+};
+
 const handleItemRequest = async (
   req: IncomingMessage,
   res: ServerResponse,
@@ -155,6 +194,8 @@ const handleItemRequest = async (
   json(res, 200, updated);
 };
 
+const REPLIES_PATH_PATTERN = new RegExp(`^${API_PATH}/([^/]+)/replies$`);
+
 const handleRequest = async (
   req: IncomingMessage,
   res: ServerResponse,
@@ -169,6 +210,19 @@ const handleRequest = async (
 
   if (pathname === API_PATH) {
     await handleCollectionRequest(req, res, adapter, reviewStore);
+    return;
+  }
+
+  const replyMatch = pathname.match(REPLIES_PATH_PATTERN);
+
+  if (replyMatch?.[1]) {
+    await handleReplyRequest(
+      req,
+      res,
+      decodeURIComponent(replyMatch[1]),
+      adapter,
+      reviewStore,
+    );
     return;
   }
 

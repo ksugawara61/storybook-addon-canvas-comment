@@ -1,6 +1,8 @@
 import type { Client } from "@libsql/client";
 import type {
   CanvasComment,
+  CanvasCommentReply,
+  CanvasCommentReplyAuthor,
   CanvasCommentStatus,
   ReviewState,
   ReviewStatus,
@@ -25,12 +27,31 @@ type Row = {
   dom_context: string | null;
 };
 
+type ReplyRow = {
+  id: string;
+  comment_id: string;
+  author: string;
+  body: string;
+  created_at: string;
+};
+
 type ReviewStateRow = {
   status: string;
   updated_at: string | null;
 };
 
-const rowToComment = (row: Row): CanvasComment => ({
+const rowToReply = (row: ReplyRow): CanvasCommentReply => ({
+  author: row.author as CanvasCommentReplyAuthor,
+  body: row.body,
+  createdAt: row.created_at,
+  id: row.id,
+});
+
+// Like comments.json, `replies` is only present once a comment has one.
+const rowToComment = (
+  row: Row,
+  replies: CanvasCommentReply[] = [],
+): CanvasComment => ({
   createdAt: row.created_at,
   dataAiComponent: row.data_ai_component ?? undefined,
   dataAiSource: row.data_ai_source ?? undefined,
@@ -42,6 +63,7 @@ const rowToComment = (row: Row): CanvasComment => ({
   note: row.note,
   pointer: JSON.parse(row.pointer) as CanvasComment["pointer"],
   rect: JSON.parse(row.rect) as CanvasComment["rect"],
+  ...(replies.length > 0 ? { replies } : {}),
   selector: row.selector,
   status: row.status as CanvasCommentStatus,
   storyId: row.story_id,
@@ -58,10 +80,26 @@ export class TursoAdapter implements StorageAdapter {
   }
 
   async list(): Promise<CanvasComment[]> {
-    const result = await this.#client.execute(
-      "SELECT * FROM canvas_comments ORDER BY created_at DESC",
+    const [comments, replies] = await Promise.all([
+      this.#client.execute(
+        "SELECT * FROM canvas_comments ORDER BY created_at DESC",
+      ),
+      this.#client.execute(
+        "SELECT * FROM canvas_comment_replies ORDER BY created_at ASC",
+      ),
+    ]);
+    const repliesByComment = (replies.rows as unknown as ReplyRow[]).reduce<
+      Map<string, CanvasCommentReply[]>
+    >((acc, row) => {
+      acc.set(row.comment_id, [
+        ...(acc.get(row.comment_id) ?? []),
+        rowToReply(row),
+      ]);
+      return acc;
+    }, new Map());
+    return (comments.rows as unknown as Row[]).map((row) =>
+      rowToComment(row, repliesByComment.get(row.id)),
     );
-    return result.rows.map((row) => rowToComment(row as unknown as Row));
   }
 
   async create(comment: CanvasComment): Promise<CanvasComment> {
@@ -100,26 +138,57 @@ export class TursoAdapter implements StorageAdapter {
       args: [status, id],
       sql: "UPDATE canvas_comments SET status = ? WHERE id = ?",
     });
-    const result = await this.#client.execute({
-      args: [id],
-      sql: "SELECT * FROM canvas_comments WHERE id = ?",
+    return this.#find(id);
+  }
+
+  async addReply(
+    id: string,
+    reply: CanvasCommentReply,
+  ): Promise<CanvasComment | null> {
+    if (!(await this.#find(id))) return null;
+    await this.#client.execute({
+      args: [reply.id, id, reply.author, reply.body, reply.createdAt],
+      sql: `INSERT INTO canvas_comment_replies
+        (id, comment_id, author, body, created_at)
+        VALUES (?, ?, ?, ?, ?)`,
     });
-    const row = result.rows[0];
-    return row ? rowToComment(row as unknown as Row) : null;
+    return this.#find(id);
   }
 
   async remove(id: string): Promise<CanvasComment | null> {
-    const result = await this.#client.execute({
-      args: [id],
-      sql: "SELECT * FROM canvas_comments WHERE id = ?",
-    });
-    const row = result.rows[0];
-    if (!row) return null;
-    await this.#client.execute({
-      args: [id],
-      sql: "DELETE FROM canvas_comments WHERE id = ?",
-    });
-    return rowToComment(row as unknown as Row);
+    const deleted = await this.#find(id);
+    if (!deleted) return null;
+    await this.#client.batch(
+      [
+        {
+          args: [id],
+          sql: "DELETE FROM canvas_comment_replies WHERE comment_id = ?",
+        },
+        { args: [id], sql: "DELETE FROM canvas_comments WHERE id = ?" },
+      ],
+      "write",
+    );
+    return deleted;
+  }
+
+  async #find(id: string): Promise<CanvasComment | null> {
+    const [comments, replies] = await Promise.all([
+      this.#client.execute({
+        args: [id],
+        sql: "SELECT * FROM canvas_comments WHERE id = ?",
+      }),
+      this.#client.execute({
+        args: [id],
+        sql: "SELECT * FROM canvas_comment_replies WHERE comment_id = ? ORDER BY created_at ASC",
+      }),
+    ]);
+    const row = comments.rows[0] as unknown as Row | undefined;
+    return row
+      ? rowToComment(
+          row,
+          (replies.rows as unknown as ReplyRow[]).map(rowToReply),
+        )
+      : null;
   }
 
   async readReviewState(): Promise<ReviewState> {

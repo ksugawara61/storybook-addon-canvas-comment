@@ -28,6 +28,7 @@ The agent then receives all open comments as structured JSON.
 | Inline commenting | Toggle "UI Feedback" in the toolbar, click an element on the canvas, and type a note in the popover. |
 | Comment pins | Saved comments are shown as pins on the canvas. Hover or focus a pin to read the note and resolve it in place. Toggle pin visibility from the toolbar (eye icon) or the panel header. |
 | Addon panel | A "UI Feedback" panel lists all comments with their selector and metadata. It supports reopen / resolve / delete. |
+| Replies | Each comment has a reply thread. Reviewers reply from the panel. Coding agents reply with the `reply` CLI to explain what they changed. |
 | Review-completion signal | A "Complete review" button in the panel flips a review status flag. A waiting coding agent can detect it. |
 | Agent-friendly output | The `dom-map` and `wait-comments` CLIs pair each comment with its saved DOM snapshot. They emit JSON built for LLM consumption. |
 
@@ -201,6 +202,7 @@ GET    /__canvas-comments/comments
 POST   /__canvas-comments/comments
 PATCH  /__canvas-comments/comments/:id
 DELETE /__canvas-comments/comments/:id
+POST   /__canvas-comments/comments/:id/replies
 GET    /__canvas-comments/review
 POST   /__canvas-comments/review
 ```
@@ -214,6 +216,20 @@ POST   /__canvas-comments/review
 ```
 
 `DELETE` removes the comment from `comments.json` and returns the deleted comment.
+
+`POST /__canvas-comments/comments/:id/replies` appends a reply and returns the updated comment.
+`author` is `reviewer` or `agent`, and `body` must not be blank:
+
+```json
+{
+  "author": "agent",
+  "body": "Increased the padding to 16px"
+}
+```
+
+A reply does not change the comment's `status`.
+A `reviewer` reply resets the review status to `reviewing`, the same as a new comment.
+An `agent` reply leaves the review status alone.
 
 `GET /__canvas-comments/review` returns the current review state.
 `POST` sets `status` to `reviewing` or `completed`:
@@ -257,6 +273,26 @@ With `--include-dom-tree` the subtree rooted at each comment target is also incl
 That keeps the context small for AI agents.
 Pass `--storybook-url` to fill the story URLs in the output.
 
+## `reply` CLI
+
+A coding agent can reply to a comment with the `reply` CLI to explain in plain words what it changed.
+It writes to `comments.json` directly, so Storybook does not need to be running.
+It prints the updated comment as JSON:
+
+```bash
+pnpm --filter storybook-addon-canvas-comments reply -- \
+  --comment-id 42f3dcbf-4e8d-49e4-86c4-7a61a62b7e70 \
+  --body "Increased the padding to 16px" \
+  --resolve
+```
+
+- `--author <agent|reviewer>` — who wrote the reply. Defaults to `agent`.
+- `--resolve` — also mark the comment `resolved`. Without it, the status is unchanged.
+- `--comments-file <path>` / `--review-status-file <path>` — override the default storage paths.
+
+The `dom-map` and `wait-comments` output includes each comment's `replies`.
+So the agent can read the earlier thread before it acts on a comment.
+
 ## JSON schema
 
 Comments are stored as a JSON array, designed to be read by AI agents:
@@ -296,6 +332,8 @@ Comments are stored as a JSON array, designed to be read by AI agents:
 Each comment may also carry a `domContext` object.
 It is a snapshot of the target element and a bounded DOM tree captured at comment time.
 It also holds the `a11yAnchor` described in [Accessibility-tree anchor](#accessibility-tree-anchor).
+A comment with replies also carries `replies`, oldest first.
+Each reply has `id`, `author` (`reviewer` or `agent`), `body`, and `createdAt`.
 The stored `selector` is built with the priority described in [Selector strategy](#selector-strategy).
 
 ## Hosted mode (Cloudflare Pages + Turso)
@@ -308,8 +346,11 @@ They store comments in a Turso (libSQL) database instead:
 - `src/cloudflare/functions/api/canvas-comments/` — Pages Functions implementing these routes
   - `GET/POST /api/canvas-comments`
   - `PATCH/DELETE /api/canvas-comments/:id`
+  - `POST /api/canvas-comments/:id/replies`
   - `GET/POST /api/canvas-comments/review`
-- `src/cloudflare/schema.sql` — the `canvas_comments` and `review_state` table definitions
+- `src/cloudflare/schema.sql` — the table definitions
+  - `canvas_comments`, `canvas_comment_replies`, and `review_state`
+  - Every statement uses `IF NOT EXISTS`, so re-run it on an existing database to add the replies table
 - `src/cloudflare/wrangler.example.toml` — example Pages configuration
   - Set `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` as environment variables
 

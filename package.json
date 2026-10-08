@@ -2,6 +2,7 @@
   "author": "canvas-comments contributors",
   "bin": {
     "canvas-comments-dom-map": "./dist/cli/dom-map.js",
+    "canvas-comments-reply": "./dist/cli/reply.js",
     "canvas-comments-wait-comments": "./dist/cli/wait-comments.js"
   },
   "dependencies": {
@@ -65,6 +66,7 @@
   "scripts": {
     "build": "tsup",
     "dom-map": "tsx src/cli/dom-map.ts",
+    "reply": "tsx src/cli/reply.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "wait-comments": "tsx src/cli/wait-comments.ts"

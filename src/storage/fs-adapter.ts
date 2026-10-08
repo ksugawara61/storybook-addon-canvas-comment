@@ -2,7 +2,11 @@ import fs from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { isCanvasComment } from "../comment-schema.ts";
 import { STORAGE_RELATIVE_PATH } from "../constants.ts";
-import type { CanvasComment, CanvasCommentStatus } from "../types.ts";
+import type {
+  CanvasComment,
+  CanvasCommentReply,
+  CanvasCommentStatus,
+} from "../types.ts";
 import type { StorageAdapter } from "./types.ts";
 
 export class FsAdapter implements StorageAdapter {
@@ -35,6 +39,19 @@ export class FsAdapter implements StorageAdapter {
   ): Promise<CanvasComment | null> {
     const comments = await this.list();
     const updated = comments.map((c) => (c.id === id ? { ...c, status } : c));
+    const found = updated.find((c) => c.id === id) ?? null;
+    if (found) await this.#write(updated);
+    return found;
+  }
+
+  async addReply(
+    id: string,
+    reply: CanvasCommentReply,
+  ): Promise<CanvasComment | null> {
+    const comments = await this.list();
+    const updated = comments.map((c) =>
+      c.id === id ? { ...c, replies: [...(c.replies ?? []), reply] } : c,
+    );
     const found = updated.find((c) => c.id === id) ?? null;
     if (found) await this.#write(updated);
     return found;
