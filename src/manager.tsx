@@ -367,26 +367,28 @@ const Panel = () => {
     }
   }, []);
 
-  const completeReview = useCallback(async () => {
+  const updateReview = useCallback(async (status: ReviewStatus) => {
+    const action = status === "completed" ? "complete" : "reopen";
+
     try {
       const response = await fetch(getReviewApiPath(), {
-        body: JSON.stringify({ status: "completed" }),
+        body: JSON.stringify({ status }),
         headers: { ...API_HEADERS, "content-type": "application/json" },
         method: "POST",
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to complete review: ${response.status}`);
+        throw new Error(`Failed to ${action} review: ${response.status}`);
       }
 
       const state = (await response.json()) as ReviewState;
       setReviewStatus(state.status);
       setError(undefined);
-    } catch (completeError) {
+    } catch (reviewError) {
       setError(
-        completeError instanceof Error
-          ? completeError.message
-          : "Failed to complete review",
+        reviewError instanceof Error
+          ? reviewError.message
+          : `Failed to ${action} review`,
       );
     }
   }, []);
@@ -594,15 +596,25 @@ const Panel = () => {
             />
             Pins
           </label>
-          <button
-            disabled={reviewStatus === "completed"}
-            onClick={() => void completeReview()}
-            style={styles.button}
-            title="Mark review as complete and signal waiting coding agents"
-            type="button"
-          >
-            Complete review
-          </button>
+          {reviewStatus === "completed" ? (
+            <button
+              onClick={() => void updateReview("reviewing")}
+              style={styles.button}
+              title="Mark review as incomplete so another review round can start"
+              type="button"
+            >
+              Reopen review
+            </button>
+          ) : (
+            <button
+              onClick={() => void updateReview("completed")}
+              style={styles.button}
+              title="Mark review as complete and signal waiting coding agents"
+              type="button"
+            >
+              Complete review
+            </button>
+          )}
           <button
             disabled={resolvedCount === 0}
             onClick={() => void deleteResolvedComments()}

@@ -29,7 +29,7 @@ The agent then receives all open comments as structured JSON.
 | Comment pins | Saved comments are shown as pins on the canvas. Hover or focus a pin to read the note and its replies, and resolve it in place. A pin with replies shows the reply count. Toggle pin visibility from the toolbar (eye icon) or the panel header. |
 | Addon panel | A "UI Feedback" panel lists all comments with their selector and metadata. It supports reopen / resolve / delete, and deleting every resolved comment at once. |
 | Replies | Each comment has a reply thread. Reviewers reply from the panel. Coding agents reply with the `reply` CLI to explain what they changed. The thread is shown in the panel and in the pin tooltip. |
-| Review-completion signal | A "Complete review" button in the panel flips a review status flag. A waiting coding agent can detect it. |
+| Review-completion signal | A "Complete review" button in the panel flips a review status flag. A waiting coding agent can detect it. "Reopen review" flips it back. |
 | Agent-friendly output | The `dom-map` and `wait-comments` CLIs pair each comment with its saved DOM snapshot. They emit JSON built for LLM consumption. |
 
 ## Requirements
@@ -110,6 +110,10 @@ The agent then moves on to follow-up work (fixes, filing issues, and so on).
 
 Adding a new comment automatically flips the status back to `reviewing`.
 So the fix → re-review loop works repeatedly.
+
+While the review is `completed`, the button reads **Reopen review**.
+Click it to set the status back to `reviewing` without adding a comment.
+Click **Complete review** again to signal a waiting agent once more.
 
 The review status is stored in the same file as the comments, under `review`:
 

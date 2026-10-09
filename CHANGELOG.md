@@ -26,6 +26,10 @@
   `DELETE /comments?status=resolved` is added to the dev server and the hosted Pages Functions.
   It deletes the replies of those comments too.
 
+- Reopen a completed review from the panel.
+  While the review is `completed`, the header button becomes **Reopen review**.
+  It sets the status back to `reviewing`.
+
 - Add reply threads to comments.
   Reviewers reply from the panel, and coding agents reply with the new `reply` CLI.
   Each reply records whether a reviewer or an agent wrote it.
