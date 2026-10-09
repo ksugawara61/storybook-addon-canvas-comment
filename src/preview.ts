@@ -16,6 +16,12 @@ import {
   PARAM_KEY,
 } from "./constants";
 import { summarizeTarget } from "./dom-summary";
+import {
+  createPinReplyBadge,
+  createPinReplyList,
+  pinLabel,
+  tooltipShift,
+} from "./pin-tooltip";
 import type { CanvasComment } from "./types";
 
 const OVERLAY_ROOT_ID = "storybook-addon-canvas-comments-overlay";
@@ -61,6 +67,9 @@ const optionalAttribute = (el: HTMLElement, name: string) =>
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), Math.max(min, max));
+
+/** Keeps overlay boxes this far from the viewport edges. */
+const VIEWPORT_MARGIN = 8;
 
 const segmentFor = (el: HTMLElement) => {
   const tag = el.tagName.toLowerCase();
@@ -371,14 +380,32 @@ const positionCommentPin = (
     height: window.innerHeight,
     width: window.innerWidth,
   });
-  const x = clamp(point.x, 8, window.innerWidth - 8);
-  const y = clamp(point.y, 8, window.innerHeight - 8);
+  const x = clamp(
+    point.x,
+    VIEWPORT_MARGIN,
+    window.innerWidth - VIEWPORT_MARGIN,
+  );
+  const y = clamp(
+    point.y,
+    VIEWPORT_MARGIN,
+    window.innerHeight - VIEWPORT_MARGIN,
+  );
   const placeTooltipLeft = x > window.innerWidth - 320;
+  // The tooltip is centered on the pin; shift it vertically when a long reply
+  // thread would otherwise cross the top or bottom edge of the viewport.
+  const shift = tooltipShift({
+    height: tooltip.offsetHeight,
+    margin: VIEWPORT_MARGIN,
+    pinY: y,
+    viewportHeight: window.innerHeight,
+  });
 
   Object.assign(wrapper.style, { left: `${x}px`, top: `${y}px` });
   Object.assign(tooltip.style, {
     left: placeTooltipLeft ? "auto" : "24px",
+    maxHeight: `${window.innerHeight - VIEWPORT_MARGIN * 2}px`,
     right: placeTooltipLeft ? "24px" : "auto",
+    transform: `translateY(${shift}px)`,
   });
 };
 
@@ -394,7 +421,7 @@ const createCommentPin = (comment: CanvasComment) => {
   const pin = document.createElement("button");
   pin.type = "button";
   pin.setAttribute(OVERLAY_ATTRIBUTE, "true");
-  pin.setAttribute("aria-label", `UI feedback: ${comment.note}`);
+  pin.setAttribute("aria-label", pinLabel(comment.note, comment.replies));
   Object.assign(pin.style, {
     background: "#f59e0b",
     border: "2px solid #ffffff",
@@ -414,6 +441,8 @@ const createCommentPin = (comment: CanvasComment) => {
     border: "1px solid rgba(255, 255, 255, 0.18)",
     borderRadius: "6px",
     boxShadow: "0 12px 32px rgba(0, 0, 0, 0.32)",
+    // maxHeight (set while positioning) then bounds the whole box.
+    boxSizing: "border-box",
     color: "#ffffff",
     display: "flex",
     flexDirection: "column",
@@ -421,27 +450,33 @@ const createCommentPin = (comment: CanvasComment) => {
     maxWidth: "280px",
     minWidth: "120px",
     opacity: "0",
+    overflowY: "auto",
     padding: "8px 10px",
     pointerEvents: "auto",
     position: "absolute",
     top: "50%",
-    transform: "translateY(-50%)",
     transition: "opacity 120ms ease, visibility 120ms ease",
     visibility: "hidden",
+    // Absolute inside the 18px pin wrapper, so it would otherwise shrink to
+    // minWidth; grow to the content up to maxWidth instead.
+    width: "max-content",
   });
 
   const noteText = document.createElement("div");
   noteText.textContent = comment.note;
   Object.assign(noteText.style, {
+    flexShrink: "0",
     marginBottom: "8px",
     whiteSpace: "pre-wrap",
   });
+  const replyList = createPinReplyList(comment.replies);
 
   const tooltipActions = document.createElement("div");
   tooltipActions.setAttribute(OVERLAY_ATTRIBUTE, "true");
   Object.assign(tooltipActions.style, {
     borderTop: "1px solid rgba(255, 255, 255, 0.12)",
     display: "flex",
+    flexShrink: "0",
     justifyContent: "flex-end",
     paddingTop: "6px",
   });
@@ -470,7 +505,11 @@ const createCommentPin = (comment: CanvasComment) => {
   });
 
   tooltipActions.append(resolveButton);
-  tooltip.append(noteText, tooltipActions);
+  tooltip.append(
+    ...[noteText, replyList, tooltipActions].filter(
+      (child) => child !== undefined,
+    ),
+  );
 
   let hideTimeout: ReturnType<typeof setTimeout> | undefined;
 
@@ -491,7 +530,12 @@ const createCommentPin = (comment: CanvasComment) => {
   pin.addEventListener("focus", show);
   pin.addEventListener("blur", hide);
 
-  wrapper.append(pin, tooltip);
+  // The badge goes before the tooltip so the tooltip paints over it.
+  wrapper.append(
+    ...[pin, createPinReplyBadge(comment.replies), tooltip].filter(
+      (child) => child !== undefined,
+    ),
+  );
 
   return {
     element: wrapper,
@@ -530,8 +574,9 @@ const renderCommentOverlay = (items: CanvasComment[]) => {
     for (const pin of pins) pin.reposition();
   };
 
-  reposition();
+  // Attach first: positioning measures the tooltips' rendered height.
   ensureCommentOverlayRoot().replaceChildren(...pins.map((pin) => pin.element));
+  reposition();
 
   return reposition;
 };

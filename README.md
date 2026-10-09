@@ -26,9 +26,9 @@ The agent then receives all open comments as structured JSON.
 | Feature | What it does |
 | --- | --- |
 | Inline commenting | Toggle "UI Feedback" in the toolbar, click an element on the canvas, and type a note in the popover. |
-| Comment pins | Saved comments are shown as pins on the canvas. Hover or focus a pin to read the note and resolve it in place. Toggle pin visibility from the toolbar (eye icon) or the panel header. |
+| Comment pins | Saved comments are shown as pins on the canvas. Hover or focus a pin to read the note and its replies, and resolve it in place. A pin with replies shows the reply count. Toggle pin visibility from the toolbar (eye icon) or the panel header. |
 | Addon panel | A "UI Feedback" panel lists all comments with their selector and metadata. It supports reopen / resolve / delete, and deleting every resolved comment at once. |
-| Replies | Each comment has a reply thread. Reviewers reply from the panel. Coding agents reply with the `reply` CLI to explain what they changed. |
+| Replies | Each comment has a reply thread. Reviewers reply from the panel. Coding agents reply with the `reply` CLI to explain what they changed. The thread is shown in the panel and in the pin tooltip. |
 | Review-completion signal | A "Complete review" button in the panel flips a review status flag. A waiting coding agent can detect it. |
 | Agent-friendly output | The `dom-map` and `wait-comments` CLIs pair each comment with its saved DOM snapshot. They emit JSON built for LLM consumption. |
 
@@ -81,6 +81,10 @@ export default config;
 Use the eye icon in the toolbar to show or hide the saved-comment pins on the canvas.
 The **Pins** checkbox in the panel header does the same.
 Hovering or focusing a pin shows the note as a tooltip with a resolve button.
+The tooltip also lists the comment's replies, oldest first, with their author and date.
+A long thread scrolls inside the tooltip, and the tooltip stays within the canvas.
+A pin with replies shows the reply count as a badge.
+Replies from the `reply` CLI appear after the story reloads.
 
 Comments are stored under the directory where the Storybook dev server runs:
 

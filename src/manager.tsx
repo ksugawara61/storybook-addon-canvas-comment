@@ -25,6 +25,7 @@ import {
   PARAM_KEY,
   TOOL_ID,
 } from "./constants";
+import { formatDate, replyAuthorLabel } from "./reply-display";
 import type {
   CanvasComment,
   CanvasCommentA11yAnchor,
@@ -207,16 +208,6 @@ const styles = {
   },
 } as const;
 
-const formatDate = (value: string) => {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString();
-};
-
 const requestDeleteResolved = async (): Promise<CanvasComment[]> => {
   const response = await fetch(`${getApiPath()}?status=resolved`, {
     headers: API_HEADERS,
@@ -247,9 +238,6 @@ const replyAuthorStyle = (author: CanvasCommentReplyAuthor) => ({
   background: author === "agent" ? "#ede9fe" : "#e0f2fe",
   color: author === "agent" ? "#5b21b6" : "#075985",
 });
-
-const replyAuthorLabel = (author: CanvasCommentReplyAuthor) =>
-  author === "agent" ? "Agent" : "Reviewer";
 
 const reviewStatusStyle = (status: ReviewStatus) => ({
   ...styles.status,
