@@ -770,6 +770,7 @@ const WithCanvasComments = (
 
     document.addEventListener("click", onClick, true);
     return () => document.removeEventListener("click", onClick, true);
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- context は描画ごとに作り直されるため、ストーリーを識別するフィールドだけを依存にする
   }, [enabled, context.id, context.name, context.title, context.viewMode]);
 
   useEffect(() => {
@@ -833,6 +834,7 @@ const WithCanvasComments = (
       stopObservingLayout();
       removeCommentOverlay();
     };
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- context は描画ごとに作り直されるため、ストーリーを識別するフィールドだけを依存にする
   }, [commentsVisible, context.id, context.viewMode]);
 
   return Story();

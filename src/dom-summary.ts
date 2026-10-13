@@ -140,7 +140,8 @@ const makeNormalizeText = (maxTextLength: number) => (value: string) => {
 const textFor = (element: Element, normalizeText: (v: string) => string) => {
   const raw =
     element instanceof HTMLElement
-      ? element.innerText
+      ? // oxlint-disable-next-line unicorn/prefer-dom-node-text-content -- 画面に表示されているテキストだけを取るため innerText を使う
+        element.innerText
       : (element.textContent ?? "");
   const text = normalizeText(raw);
   return text ? text : undefined;

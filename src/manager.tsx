@@ -4,7 +4,7 @@ import {
   EyeIcon,
   TrashIcon,
 } from "@storybook/icons";
-// biome-ignore lint/correctness/noUnusedImports: Storybook manager bundles this TSX with the classic JSX runtime.
+// oxlint-disable-next-line no-unused-vars -- Storybook manager bundles this TSX with the classic JSX runtime.
 import React, { useCallback, useEffect, useState } from "react";
 import { AddonPanel, ToggleButton } from "storybook/internal/components";
 import {
