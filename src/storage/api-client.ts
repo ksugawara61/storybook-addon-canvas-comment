@@ -7,13 +7,43 @@ import type {
   ReviewStatus,
 } from "../types.ts";
 
+type AccessEnv = Record<string, string | undefined>;
+
+/**
+ * Cloudflare Access service token headers, taken from `CF_ACCESS_CLIENT_ID` and
+ * `CF_ACCESS_CLIENT_SECRET`. Empty when neither is set.
+ */
+const accessHeadersFromEnv = (
+  env: AccessEnv = process.env,
+): Record<string, string> => {
+  const id = env.CF_ACCESS_CLIENT_ID ?? "";
+  const secret = env.CF_ACCESS_CLIENT_SECRET ?? "";
+
+  if (!id && !secret) {
+    return {};
+  }
+
+  if (!id || !secret) {
+    throw new Error(
+      "Set both CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET, or neither.",
+    );
+  }
+
+  return { "CF-Access-Client-Id": id, "CF-Access-Client-Secret": secret };
+};
+
 /** Reads and writes comments through a hosted canvas-comments API over HTTP. */
 export class ApiClient {
   readonly #commentsUrl: string;
+  readonly #headers: Record<string, string>;
   readonly #reviewUrl: string;
 
-  /** @param apiUrl e.g. `https://example.pages.dev/api/canvas-comments/curio/comments` */
-  constructor(apiUrl: string) {
+  /**
+   * @param apiUrl e.g. `https://example.pages.dev/api/canvas-comments/curio/comments`
+   * @param env Source of the Cloudflare Access service token. Defaults to `process.env`.
+   */
+  constructor(apiUrl: string, env: AccessEnv = process.env) {
+    this.#headers = { ...API_HEADERS, ...accessHeadersFromEnv(env) };
     this.#commentsUrl = apiUrl.replace(/\/+$/, "");
 
     if (!this.#commentsUrl.endsWith("/comments")) {
@@ -60,7 +90,7 @@ export class ApiClient {
   #send<T>(url: string, method: string, body: unknown): Promise<T> {
     return this.#request<T>(url, {
       body: JSON.stringify(body),
-      headers: { ...API_HEADERS, "content-type": "application/json" },
+      headers: { ...this.#headers, "content-type": "application/json" },
       method,
     });
   }
@@ -68,7 +98,7 @@ export class ApiClient {
   async #request<T>(url: string, init: RequestInit = {}): Promise<T> {
     const response = await fetch(url, {
       ...init,
-      headers: init.headers ?? API_HEADERS,
+      headers: init.headers ?? this.#headers,
     });
 
     if (!response.ok) {

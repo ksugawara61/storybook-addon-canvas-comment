@@ -418,9 +418,18 @@ pnpm --filter storybook-addon-canvas-comments wait-comments -- \
   --api-url https://your-storybook.pages.dev/api/canvas-comments/<app>/comments
 ```
 
-The CLI sends no credentials.
-If Cloudflare Access protects the site, the CLI cannot call it as is.
-Allow the caller with a bypass policy first.
+If Cloudflare Access protects the site, give the CLI a [service token](https://developers.cloudflare.com/cloudflare-one/identity/service-tokens/).
+Add an Access policy with the **Service Auth** action that includes the token.
+Then set `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET` before running the CLI.
+Every `--api-url` request then sends them as the Access headers.
+They are `CF-Access-Client-Id` and `CF-Access-Client-Secret`.
+Set both variables, or neither. Without them, the CLI sends no credentials.
+
+```bash
+CF_ACCESS_CLIENT_ID=<client id> CF_ACCESS_CLIENT_SECRET=<client secret> \
+  pnpm --filter storybook-addon-canvas-comments dom-map -- \
+  --api-url https://your-storybook.pages.dev/api/canvas-comments/<app>/comments
+```
 
 ## Contributing
 

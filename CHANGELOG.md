@@ -17,6 +17,8 @@
   The old array-only `comments.json` is still read, and it is rewritten in the new format on the next write.
 - Add `--api-url` to `dom-map`, `reply`, and `wait-comments`.
   It reads and writes the hosted API instead of a local file.
+- `--api-url` requests can send a Cloudflare Access service token.
+  Set `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET` to use it.
 - The hosted API now resets the review status to `reviewing` when a comment is created.
   This matches the dev server.
 - `typecheck` now also checks `src/cloudflare`.

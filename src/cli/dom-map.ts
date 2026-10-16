@@ -24,6 +24,11 @@ Options:
                               Comments to include. Defaults to open.
   --include-dom-tree          Include the DOM subtree rooted at each comment target.
   --help                      Show this help.
+
+Environment:
+  CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET
+                              Cloudflare Access service token sent with --api-url
+                              requests. Set both, or neither.
 `;
 
 const parseStatus = (value: string): CanvasCommentDomMapStatus => {

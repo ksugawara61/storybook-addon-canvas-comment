@@ -24,6 +24,11 @@ Options:
                               file, e.g.
                               https://example.pages.dev/api/canvas-comments/curio/comments.
   --help                      Show this help.
+
+Environment:
+  CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET
+                              Cloudflare Access service token sent with --api-url
+                              requests. Set both, or neither.
 `;
 
 type ParsedOptions = Partial<ReplyToCanvasCommentOptions>;

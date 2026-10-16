@@ -32,6 +32,11 @@ Options:
   --story-id <id>             Restrict output to a single story id.
   --include-dom-tree          Include a bounded DOM tree in the JSON output.
   --help                      Show this help.
+
+Environment:
+  CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET
+                              Cloudflare Access service token sent with --api-url
+                              requests. Set both, or neither.
 `;
 
 type WaitOptions = {
