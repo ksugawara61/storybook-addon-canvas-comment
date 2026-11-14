@@ -1,0 +1,18 @@
+{
+  "name": "storybook-addon-canvas-comment",
+  "owner": {
+    "name": "ksugawara61"
+  },
+  "metadata": {
+    "description": "Claude Code plugins that work with storybook-addon-canvas-comments."
+  },
+  "plugins": [
+    {
+      "name": "canvas-comments",
+      "source": "./plugins/canvas-comments",
+      "description": "Turn open Storybook canvas comments into GitHub issues, grouped by feature.",
+      "category": "development",
+      "keywords": ["storybook", "canvas-comments", "design-review", "github-issues"]
+    }
+  ]
+}

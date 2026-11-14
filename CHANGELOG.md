@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add a Claude Code plugin marketplace with the `canvas-comments` plugin.
+  Its `canvas-issues` skill files the open canvas comments as GitHub issues, one per feature.
+  It comes from the curio repository and no longer assumes curio's layout.
+  Project-specific settings go in `.claude/canvas-issues.md`.
 - Move the package out of the curio monorepo into its own repository, `ksugawara61/storybook-addon-canvas-comment`.
   Until it is on npm, install it as a git dependency (see the README).
   A `prepare` script builds `dist/` when the package is installed from git.

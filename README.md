@@ -437,6 +437,48 @@ CF_ACCESS_CLIENT_ID=<client id> CF_ACCESS_CLIENT_SECRET=<client secret> \
   --api-url https://your-storybook.pages.dev/api/canvas-comments/<app>/comments
 ```
 
+## Claude Code plugin
+
+This repository is also a [Claude Code plugin marketplace](https://code.claude.com/docs/en/plugin-marketplaces).
+The `canvas-comments` plugin ships the `canvas-issues` skill.
+The skill reads the open comments with the `dom-map` CLI and finds the component each one points at.
+It then files one GitHub issue per feature, labeled `design`.
+It needs the [GitHub CLI](https://cli.github.com/) (`gh`), signed in to the repository.
+
+Install it in Claude Code:
+
+```text
+/plugin marketplace add ksugawara61/storybook-addon-canvas-comment
+/plugin install canvas-comments@storybook-addon-canvas-comment
+```
+
+To turn it on for everyone working in a project, add it to the project's `.claude/settings.json`:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "storybook-addon-canvas-comment": {
+      "source": {
+        "source": "github",
+        "repo": "ksugawara61/storybook-addon-canvas-comment"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "canvas-comments@storybook-addon-canvas-comment": true
+  }
+}
+```
+
+Then ask Claude to "turn the canvas comments into issues", or run `/canvas-comments:canvas-issues`.
+Pass `dry-run` to write the planned issues to `canvas-issues-dry-run/` instead of filing them.
+Pass `api-url=<url>` to read hosted comments.
+
+The skill works without any setup in a project with one Storybook.
+For anything project-specific, add `.claude/canvas-issues.md` at the repository root.
+Examples are where each app's Storybook lives, the hosted API URL, where shared UI primitives are, and the issue template.
+The skill reads that file first and follows it.
+
 ## Development
 
 ```bash
