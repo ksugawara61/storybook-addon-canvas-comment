@@ -38,14 +38,6 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./manager": {
-      "types": "./dist/manager.d.ts",
-      "import": "./dist/manager.js"
-    },
-    "./preview": {
-      "types": "./dist/preview.d.ts",
-      "import": "./dist/preview.js"
-    },
     "./package.json": "./package.json"
   },
   "files": [

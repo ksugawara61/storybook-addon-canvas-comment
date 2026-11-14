@@ -8,6 +8,9 @@
 - Fix the built preset: `dist/index.js` now points Storybook at `dist/manager.js` and `dist/preview.js`.
   It used to point at `.tsx` / `.ts` files that are not shipped.
 - Add the `./preset` export, so `addons: ["storybook-addon-canvas-comments"]` loads the preset.
+  The preset registers the manager and preview entries itself.
+- **Breaking:** remove the `./manager` and `./preview` exports.
+  Storybook loads those exports in addition to the preset, so the preview ran twice and the build failed.
 - Ship `src/constants.ts`, which the hosted Pages Functions import.
 - The CLI help shows the `canvas-comments-*` bin names.
 
