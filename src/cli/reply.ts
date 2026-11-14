@@ -5,7 +5,7 @@ import {
 import type { CanvasCommentReplyAuthor } from "../types.ts";
 
 const HELP = `Usage:
-  pnpm --filter storybook-addon-canvas-comments reply -- --comment-id <id> --body <text> [options]
+  canvas-comments-reply --comment-id <id> --body <text> [options]
 
 Appends a reply to a canvas comment in comments.json (or the hosted API) and prints the updated comment
 as JSON. No browser or running Storybook is required, so a coding agent can explain

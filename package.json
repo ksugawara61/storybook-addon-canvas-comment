@@ -1,44 +1,52 @@
 {
-  "author": "canvas-comments contributors",
+  "author": "ksugawara61",
   "bin": {
     "canvas-comments-dom-map": "./dist/cli/dom-map.js",
     "canvas-comments-reply": "./dist/cli/reply.js",
     "canvas-comments-wait-comments": "./dist/cli/wait-comments.js"
   },
+  "bugs": {
+    "url": "https://github.com/ksugawara61/storybook-addon-canvas-comment/issues"
+  },
   "dependencies": {
-    "dom-accessibility-api": "catalog:"
+    "dom-accessibility-api": "^0.6.3"
   },
   "description": "Storybook addon for inline UI feedback on the canvas — click to annotate, review in a panel, and hand structured context to coding agents via a filesystem dom-map.",
   "devDependencies": {
-    "@cloudflare/workers-types": "catalog:",
-    "@storybook/icons": "catalog:",
-    "@types/node": "catalog:",
-    "@types/react": "catalog:",
-    "jsdom": "catalog:",
-    "react": "catalog:",
-    "storybook": "catalog:",
-    "tsup": "catalog:",
-    "tsx": "catalog:",
-    "typescript": "catalog:",
-    "vite": "catalog:",
-    "vitest": "catalog:"
+    "@cloudflare/workers-types": "^4.20251011.0",
+    "@storybook/icons": "2.2.0",
+    "@types/node": "25.2.0",
+    "@types/react": "^19.3.0",
+    "jsdom": "^28.0.0",
+    "react": "19.3.0",
+    "storybook": "10.6.6",
+    "tsup": "^8.5.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3",
+    "vite": "^7.3.1",
+    "vitest": "5.0.5"
   },
   "engines": {
     "node": ">=20"
   },
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./preset": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     },
     "./manager": {
-      "import": "./dist/manager.js",
-      "types": "./dist/manager.d.ts"
+      "types": "./dist/manager.d.ts",
+      "import": "./dist/manager.js"
     },
     "./preview": {
-      "import": "./dist/preview.js",
-      "types": "./dist/preview.d.ts"
-    }
+      "types": "./dist/preview.d.ts",
+      "import": "./dist/preview.js"
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "CHANGELOG.md",
@@ -47,11 +55,13 @@
     "README.md",
     "src/cloudflare",
     "src/comment-schema.ts",
+    "src/constants.ts",
     "src/review-schema.ts",
     "src/storage",
     "src/types.ts",
     "!src/**/*.test.ts"
   ],
+  "homepage": "https://github.com/ksugawara61/storybook-addon-canvas-comment#readme",
   "keywords": [
     "storybook-addon",
     "canvas",
@@ -63,10 +73,15 @@
   "license": "MIT",
   "main": "./dist/index.js",
   "name": "storybook-addon-canvas-comments",
+  "packageManager": "pnpm@11.1.2",
   "peerDependencies": {
     "react": ">=18",
     "storybook": ">=8",
     "vite": ">=5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ksugawara61/storybook-addon-canvas-comment.git"
   },
   "scripts": {
     "build": "tsup",
@@ -74,7 +89,8 @@
     "reply": "tsx src/cli/reply.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit && tsc --noEmit -p src/cloudflare/tsconfig.json",
-    "wait-comments": "tsx src/cli/wait-comments.ts"
+    "wait-comments": "tsx src/cli/wait-comments.ts",
+    "prepare": "tsup"
   },
   "storybook": {
     "displayName": "Canvas Comments",

@@ -1,0 +1,10 @@
+node_modules
+dist
+coverage
+*.tgz
+.DS_Store
+# Comments the dev server writes when you run Storybook locally
+**/.storybook/canvas-comments/comments.json
+# wrangler.toml is generated per deployment; keep only the example
+src/cloudflare/wrangler.toml
+src/cloudflare/.wrangler

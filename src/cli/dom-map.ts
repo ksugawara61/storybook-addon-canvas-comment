@@ -5,7 +5,7 @@ import {
 } from "../dom-map";
 
 const HELP = `Usage:
-  pnpm --filter storybook-addon-canvas-comments dom-map -- [options]
+  canvas-comments-dom-map [options]
 
 Reads comments.json from disk and prints each comment with the DOM snapshot captured
 when it was created. No browser or running Storybook is required.

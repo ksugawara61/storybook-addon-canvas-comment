@@ -13,8 +13,15 @@ import { FsAdapter } from "./storage/fs-adapter.ts";
 import { FsReviewStore } from "./storage/review-store.ts";
 import type { StorageAdapter } from "./storage/types.ts";
 
-const managerEntry = fileURLToPath(new URL("./manager.tsx", import.meta.url));
-const previewEntry = fileURLToPath(new URL("./preview.ts", import.meta.url));
+// From source (src/index.ts) the sibling entries are .tsx / .ts files.
+// From the build (dist/index.js) tsup has emitted them as .js files.
+const isSource = import.meta.url.endsWith(".ts");
+const managerEntry = fileURLToPath(
+  new URL(isSource ? "./manager.tsx" : "./manager.js", import.meta.url),
+);
+const previewEntry = fileURLToPath(
+  new URL(isSource ? "./preview.ts" : "./preview.js", import.meta.url),
+);
 
 export const managerEntries = (entries: string[] = []) => [
   ...entries,

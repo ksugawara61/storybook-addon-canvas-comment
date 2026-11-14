@@ -8,7 +8,7 @@ import { FsReviewStore } from "../storage/review-store.ts";
 import type { ReviewState, ReviewStatus } from "../types.ts";
 
 const HELP = `Usage:
-  pnpm --filter storybook-addon-canvas-comments wait-comments -- [options]
+  canvas-comments-wait-comments [options]
 
 Blocks until the user clicks "Complete review" in the Storybook UI, then prints the
 open canvas comments (dom-map JSON) to stdout and exits. Designed for a

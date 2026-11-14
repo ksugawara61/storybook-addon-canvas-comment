@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Move the package out of the curio monorepo into its own repository, `ksugawara61/storybook-addon-canvas-comment`.
+  Until it is on npm, install it as a git dependency (see the README).
+  A `prepare` script builds `dist/` when the package is installed from git.
+- Fix the built preset: `dist/index.js` now points Storybook at `dist/manager.js` and `dist/preview.js`.
+  It used to point at `.tsx` / `.ts` files that are not shipped.
+- Add the `./preset` export, so `addons: ["storybook-addon-canvas-comments"]` loads the preset.
+- Ship `src/constants.ts`, which the hosted Pages Functions import.
+- The CLI help shows the `canvas-comments-*` bin names.
+
 - **Breaking:** hosted mode now stores comments in Cloudflare R2 instead of Turso.
   Turso support is removed.
   `@libsql/client`, `schema.sql`, and the `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` variables are gone.
