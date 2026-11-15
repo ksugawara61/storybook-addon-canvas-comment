@@ -1,6 +1,7 @@
 # Publishes to npm with Trusted Publishing (OIDC). No NPM_TOKEN is used.
 # On npmjs.com, the package's Trusted Publisher points at this repository,
-# this workflow file (release.yaml), and the "npm" environment.
+# this workflow file (release.yaml), and the "npm" environment, and allows
+# only staged publishing (neither "Allow npm publish" nor "Allow npm dist-tag").
 name: Release
 on:
   pull_request:
@@ -55,7 +56,7 @@ jobs:
           node-version-file: ".node-version"
           cache: pnpm
           registry-url: "https://registry.npmjs.org"
-      # Trusted Publishing needs npm CLI 11.5.1 or later; Node 22 bundles npm 10.
+      # Trusted Publishing and `npm stage` need a newer npm than the one Node 22 bundles.
       - name: Install latest npm
         if: steps.tag-check.outputs.exists == 'false'
         run: |
@@ -71,18 +72,19 @@ jobs:
       - name: Test
         if: steps.tag-check.outputs.exists == 'false'
         run: pnpm test
-      - name: Publish to npm with provenance
+      # The Trusted Publisher only allows `npm stage publish`. The version stays
+      # private until a maintainer approves it with 2FA (`npm stage approve`).
+      # prepare (tsup) builds dist/ before staging.
+      - name: Stage the package on npm with provenance
         if: steps.tag-check.outputs.exists == 'false'
         env:
           NAME: ${{ steps.package.outputs.name }}
           VERSION: ${{ steps.package.outputs.version }}
-        # prepare (tsup) builds dist/ before publishing.
-        # Skip when this version is already on npm (a retry after a failed GitHub Release step).
         run: |
           if npm view "$NAME@$VERSION" version > /dev/null 2>&1; then
             echo "$NAME@$VERSION is already on npm"
           else
-            npm publish --provenance --access public
+            npm stage publish --provenance --access public
           fi
       - name: Create GitHub Release with tag
         id: create-release
@@ -109,11 +111,18 @@ jobs:
           RELEASE_URL: ${{ steps.create-release.outputs.url }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body "✅ **Release v$VERSION completed successfully!**
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body "📦 **v$VERSION is staged on npm. Approve it to publish.**
 
-          - 📦 npm package: https://www.npmjs.com/package/$PACKAGE_NAME/v/$VERSION
+          Approve it in the **Staged Packages** tab of your npmjs.com account settings, or with the CLI:
+
+          \`\`\`sh
+          npm stage list $PACKAGE_NAME
+          npm stage approve <stage-id>   # asks for 2FA
+          \`\`\`
+
           - 🏷️ GitHub Release: $RELEASE_URL
-          - 🔗 Workflow run: $RUN_URL"
+          - 🔗 Workflow run: $RUN_URL
+          - After approval: https://www.npmjs.com/package/$PACKAGE_NAME/v/$VERSION"
       - name: Comment on PR - Failure
         if: failure() && steps.tag-check.outputs.exists == 'false'
         env:
