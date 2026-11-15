@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Publish to npm from CI with Trusted Publishing (OIDC) instead of an `NPM_TOKEN`.
+  CI stages each version (`npm stage publish`), and a maintainer approves it with 2FA.
   Releases go through a draft release PR labeled `Type: Release` (see "Releasing" in the README).
 - Add a Claude Code plugin marketplace with the `canvas-comments` plugin.
   Its `canvas-issues` skill files the open canvas comments as GitHub issues, one per feature.

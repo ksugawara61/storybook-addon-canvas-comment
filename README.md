@@ -501,8 +501,14 @@ CI publishes to npm with [Trusted Publishing](https://docs.npmjs.com/trusted-pub
 2. Edit the PR body if needed. It becomes the GitHub Release notes.
 3. Mark the PR ready and merge it.
    The **Release** workflow (`.github/workflows/release.yaml`) runs in the `npm` environment.
-   It runs the checks, publishes to npm with provenance, creates the `vX.Y.Z` tag and GitHub Release, and comments the result on the PR.
+   It runs the checks, stages the package on npm with provenance (`npm stage publish`), creates the `vX.Y.Z` tag and GitHub Release, and comments the result on the PR.
    Re-running it after a release that succeeded does nothing.
+4. Approve the staged version with 2FA. Until then it is not public.
+
+   ```bash
+   npm stage list storybook-addon-canvas-comments
+   npm stage approve <stage-id>
+   ```
 
 PRs opened by `GITHUB_TOKEN` do not trigger other workflows, so CI does not run on the release PR by itself.
 The Release workflow runs the same checks before publishing.
@@ -519,6 +525,7 @@ The Release workflow runs the same checks before publishing.
   - Repository: `storybook-addon-canvas-comment`
   - Workflow filename: `release.yaml`
   - Environment name: `npm`
+  - Allowed actions: leave both "Allow npm publish" and "Allow npm dist-tag" unchecked, so CI can only stage new versions.
 - **npm:** set **Publishing access** to "Require two-factor authentication and disallow tokens".
 
 If publishing fails with `422 Unprocessable Entity`, check the Trusted Publisher settings and that `repository.url` in `package.json` matches this repository.
