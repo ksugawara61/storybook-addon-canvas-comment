@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Fix the toolbar buttons and panel crashing in projects that use React 19.
+  The manager bundle imported `react/jsx-runtime`, so Storybook bundled the project's React 19 copy, which does not work with the manager's React 18.
+  The manager code now uses the classic JSX runtime (`React.createElement`) with the manager's own React.
+- Add a React + Vite example Storybook under `examples/react-vite`, and demo images to the README.
+
 ## 0.1.3
 
 - The package is on npm. Install it with `pnpm add -D storybook-addon-canvas-comments` instead of from GitHub.

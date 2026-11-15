@@ -1,3 +1,9 @@
+/**
+ * The manager provides `react` as a global but not `react/jsx-runtime`.
+ * With the automatic runtime, the project's own jsx-runtime would be bundled,
+ * and it breaks when its React major differs from the manager's (React 19 vs. 18).
+ */
+/** @jsxRuntime classic */
 import {
   CommentAddIcon,
   EyeCloseIcon,
