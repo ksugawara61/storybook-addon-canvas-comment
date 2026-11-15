@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.1
+
 - Publish to npm from CI with Trusted Publishing (OIDC) instead of an `NPM_TOKEN`.
   Releases go through a draft release PR labeled `Type: Release` (see "Releasing" in the README).
 - Add a Claude Code plugin marketplace with the `canvas-comments` plugin.
