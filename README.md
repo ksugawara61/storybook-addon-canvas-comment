@@ -12,14 +12,17 @@ The agent then receives all open comments as structured JSON.
 
 ## Demo
 
-> Screenshots and GIF demos will be added after the English UI is finalized.
+![Leaving comments on the canvas, hovering a pin, and completing the review](docs/images/demo.gif)
 
-<!-- TODO: Add screenshots showing:
-1. Toolbar toggle → canvas click → comment input popover
-2. Comment pins displayed on the canvas
-3. Addon panel with comment list
-4. Review completion button flow
--->
+| Leave a comment | Read the thread on a pin | Review in the panel |
+| --- | --- | --- |
+| ![Comment popover on the Sign up button](docs/images/comment-popover.png) | ![Pin tooltip with an agent reply](docs/images/pin-tooltip.png) | ![UI Feedback panel after completing the review](docs/images/panel.png) |
+
+1. Turn on **UI feedback** in the toolbar and click an element on the canvas. Type a note in the popover and save it.
+2. Each comment becomes a pin. Hover a pin to read the note and its replies, such as one a coding agent posted with the `reply` CLI.
+3. The **UI Feedback** panel lists every comment with its accessibility anchor and selector. **Complete review** signals a waiting agent.
+
+The demo runs the example Storybook in [`examples/react-vite`](examples/react-vite).
 
 ## Features
 
@@ -478,6 +481,15 @@ pnpm install
 pnpm typecheck
 pnpm test
 pnpm build
+```
+
+To try a change in Storybook, run the example in [`examples/react-vite`](examples/react-vite/README.md):
+
+```bash
+pnpm build
+cd examples/react-vite
+pnpm install
+pnpm storybook
 ```
 
 Try a local change in another project with a `link:` or `file:` dependency on your checkout.
