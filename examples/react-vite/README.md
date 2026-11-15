@@ -1,7 +1,7 @@
 # React + Vite example
 
 A small Storybook (React + Vite) that uses `storybook-addon-canvas-comments`.
-It is used to try the addon locally and to record the demo images in the root README.
+It is used to try the addon (comments and the board) locally and to record the demo images in the root README.
 
 ## Run it
 
@@ -21,6 +21,23 @@ pnpm storybook
 Open http://localhost:6006, turn on **UI feedback** in the toolbar, and click any element on the canvas.
 
 Comments are saved to `examples/react-vite/.storybook/canvas-comments/comments.json`, which is git-ignored.
+
+## Try the board
+
+Open http://localhost:6006/?path=/board/, or press **+ Board** in the toolbar of a story.
+The stories come in variants to compare: `Button` (Primary / Secondary), `ProductCard` (Default / Speaker) and `SignupForm` (Default / Short Title).
+
+1. Type `signup` in **Add a story…** and add both SignupForm stories.
+2. Press **Duplicate** on the Default frame.
+3. Switch to **Element** (`E`), drag the **Sign up** button in the copy, and type what to change in the side panel.
+4. Switch to **Note** (`N`) and click the board to leave a note.
+
+The board is saved to `examples/react-vite/.storybook/canvas-comments/board.json`.
+The instructions for a coding agent are written next to it, to `board-instructions.md`:
+
+```bash
+cat .storybook/canvas-comments/board-instructions.md
+```
 
 After you change the addon, run `pnpm build` at the root again, then reinstall here so the copied package is refreshed:
 

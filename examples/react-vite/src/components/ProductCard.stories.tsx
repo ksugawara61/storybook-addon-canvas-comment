@@ -11,3 +11,12 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const Speaker: Story = {
+  args: {
+    description: "Waterproof, 12-hour battery life.",
+    emoji: "🔊",
+    name: "Bluetooth Speaker",
+    price: "$89",
+  },
+};

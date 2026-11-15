@@ -22,6 +22,13 @@ export default defineConfig([
     external: ["storybook", "react", "@storybook/icons"],
   },
   {
+    entry: { "board-manager": "src/board/manager.tsx" },
+    format: ["esm"],
+    outDir: "dist",
+    // Like src/manager.tsx, the board uses the classic JSX runtime with the manager's React.
+    external: ["storybook", "react"],
+  },
+  {
     entry: { preview: "src/preview.ts" },
     format: ["esm"],
     dts,

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Add a board page (`/?path=/board/`) for comparing stories side by side.
+  Lay stories out as frames, duplicate them, override their args, and resize them to Mobile / Tablet / Desktop.
+  In Element mode, click an element in a frame to comment on it, or drag it to leave a move instruction that is previewed in the frame.
+  Notes can go on the board or on a frame.
+  The dev server saves the board to `.storybook/canvas-comments/board.json` and writes the instructions for coding agents to `.storybook/canvas-comments/board-instructions.md`.
+  A static build saves to `localStorage`.
+  **+ Board** in the story toolbar adds the current story to the board.
+  Turn it off with the preset option `board: false`.
+  Ignore the whole `.storybook/canvas-comments/` directory in git, not only `comments.json`.
+- The example Storybook has story variants to compare on the board, and its cards fit a 390px-wide frame.
 - Fix the toolbar buttons and panel crashing in projects that use React 19.
   The manager bundle imported `react/jsx-runtime`, so Storybook bundled the project's React 19 copy, which does not work with the manager's React 18.
   The manager code now uses the classic JSX runtime (`React.createElement`) with the manager's own React.

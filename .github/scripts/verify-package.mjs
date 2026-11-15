@@ -31,6 +31,7 @@ const entries = [
   ),
   ...Object.values(pkg.bin ?? {}),
   "dist/manager.js",
+  "dist/board-manager.js",
   "dist/preview.js",
 ];
 for (const entry of new Set(entries)) {

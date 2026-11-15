@@ -10,6 +10,10 @@ A DOM snapshot of the target element is saved with it too.
 A companion CLI lets an agent block until you finish reviewing.
 The agent then receives all open comments as structured JSON.
 
+A **board** page lays several stories side by side, like a design canvas.
+You can duplicate a frame, drag elements to where they should go, and leave notes.
+The board writes those instructions as Markdown for a coding agent.
+
 ## Demo
 
 ![Leaving comments on the canvas, hovering a pin, and completing the review](docs/images/demo.gif)
@@ -34,6 +38,7 @@ The demo runs the example Storybook in [`examples/react-vite`](examples/react-vi
 | Replies | Each comment has a reply thread. Reviewers reply from the panel. Coding agents reply with the `reply` CLI to explain what they changed. The thread is shown in the panel and in the pin tooltip. |
 | Review-completion signal | A "Complete review" button in the panel flips a review status flag. A waiting coding agent can detect it. "Reopen review" flips it back. |
 | Agent-friendly output | The `dom-map` and `wait-comments` CLIs pair each comment with its saved DOM snapshot. They emit JSON built for LLM consumption. |
+| Board | A board page (`/?path=/board/`) lays stories out as frames to compare variants. Drag elements in a frame to leave move instructions, comment on them, and put notes on the board. The instructions are written as Markdown for coding agents. See [Board](#board). |
 
 ## Requirements
 
@@ -97,7 +102,12 @@ The **Delete resolved (N)** button in the panel header deletes all resolved comm
 Their replies are deleted too.
 Open comments are kept.
 
-Treat this file as local feedback data (add it to `.gitignore`). A coding agent can read the JSON directly, or use the CLIs below for DOM-mapped output.
+Treat this file as local feedback data. A coding agent can read the JSON directly, or use the CLIs below for DOM-mapped output.
+Add the directory to `.gitignore`, because the [board](#board) saves its files next to it:
+
+```gitignore
+**/.storybook/canvas-comments/
+```
 
 ## Review completion (coding-agent integration)
 
@@ -142,6 +152,88 @@ Pass `--no-reset` to skip the reset. Other options:
 - `--timeout-ms <ms>` — give up after this long (exit code 1); `0` waits indefinitely (default).
 - `--poll-interval-ms <ms>` — polling interval (default `2000`).
 - `--status <open|resolved|all>` / `--story-id <id>` — filter which comments are included in the output.
+
+## Board
+
+The board compares stories side by side and collects fix instructions across them.
+Open it at `/?path=/board/`, or press **+ Board** in the toolbar of a story to add that story and open the board.
+
+![Board with two SignupForm variants and a duplicated frame with a moved button, a comment and a note](docs/images/board.png)
+
+| Action | How |
+| --- | --- |
+| Add a frame | Type in **Add a story…** at the top and press `Enter`, or press **+ Board** on a story. |
+| Duplicate a frame | **Duplicate** in the frame header. Its instructions are copied too, so the copy can branch off as another variant. |
+| Move and resize | Drag a frame by its header, or anywhere on it in Select mode. Drag the bottom-right corner to resize, or pick **Mobile** / **Tablet** / **Desktop** in the side panel. |
+| Override args | Type args in the side panel in Storybook's URL format, such as `label:Save;disabled:!true`. |
+| Pan and zoom | Drag the background or scroll to pan. `Ctrl` / `Cmd` + scroll zooms. **Fit** shows every frame. |
+| Several boards | Pick a board in the toolbar, or use **New**, **Rename** and **Delete**. |
+
+The board has four modes. Switch them in the toolbar or with a key:
+
+| Mode | Key | What it does |
+| --- | --- | --- |
+| Select | `V` | Select, move and resize frames. |
+| Interact | `I` | Use the stories as usual, for example to open a menu before you comment. |
+| Element | `E` | Click an element in a frame to comment on it. Drag it to leave a move instruction. |
+| Note | `N` | Click the board to put a note. A note placed on a frame belongs to that frame. |
+
+In Element mode, pressing an element picks its closest interactive ancestor (`button`, `a`, `[role]`, `[tabindex]` and so on).
+So pressing the text inside a button picks the button.
+Hold `Alt` to pick one level further out.
+Each instruction gets a numbered pin, and moves are previewed inside the frame with a CSS `translate`.
+The story code does not change; a coding agent or a person makes the real fix.
+
+### Board instructions for coding agents
+
+With the dev server, the board saves two files under the directory where Storybook runs:
+
+```text
+.storybook/canvas-comments/board.json             # the boards, frames, instructions and notes
+.storybook/canvas-comments/board-instructions.md  # the instructions as Markdown
+```
+
+`board-instructions.md` is rewritten on every save, so an agent can read it as-is.
+**Copy as Markdown** in the side panel copies the same Markdown for the current board.
+Each element is identified by its role and accessible name, and by a CSS selector.
+Moves are in the story's rendered CSS px:
+
+```markdown
+## Board 1
+
+### Example/SignupForm / Default (copy)
+
+- story: `example-signupform--default`
+- size: 390×720
+
+1. button "Sign up" (`#storybook-root > form > div:nth-of-type(3) > button:nth-of-type(2)`): move left 131px, move down 94px / Put Sign up on its own row, full width
+2. heading "Create your account" (`#storybook-root > form > h2`): Use the title from Short Title
+
+### Board notes
+
+- Ship the copy with the full-width button
+```
+
+A statically built Storybook has no dev-server API.
+There the board saves to the browser's `localStorage`, so only that browser sees it.
+Use **Copy as Markdown** to hand the instructions over.
+
+The board reads each frame's DOM directly, so the manager and the preview must be served from the same origin.
+That is the default for `storybook dev` and `storybook build`.
+Every frame is a separate iframe, so keep a board to the stories you want to compare.
+
+To leave out the board page and the **+ Board** button, turn the board off in the preset options:
+
+```ts
+const config: StorybookConfig = {
+  addons: [
+    {
+      name: "storybook-addon-canvas-comments",
+      options: { board: false },
+    },
+  ],
+};
+```
 
 ## Accessibility-tree anchor
 
@@ -217,6 +309,8 @@ DELETE /__canvas-comments/comments/:id
 POST   /__canvas-comments/comments/:id/replies
 GET    /__canvas-comments/review
 POST   /__canvas-comments/review
+GET    /__canvas-comments/board
+PUT    /__canvas-comments/board
 ```
 
 `PATCH` updates a comment's `status` to `open` or `resolved`:
@@ -256,6 +350,9 @@ An `agent` reply leaves the review status alone.
   "status": "completed"
 }
 ```
+
+`GET /__canvas-comments/board` returns the saved boards as `{ "version": 1, "boards": [...] }`.
+`PUT` replaces them, writes `board.json`, and rewrites `board-instructions.md`.
 
 Requests from the addon are sent with `Accept: msw/passthrough`.
 So stories using `msw-storybook-addon` do not log unhandled-request warnings.
@@ -388,6 +485,9 @@ It has the same `{ "comments": [...], "review": {...} }` format as the local fil
 Writes are conditional on the object's etag.
 If another writer changed the object in the meantime, the function re-reads it and retries.
 So concurrent writes do not lose comments.
+
+The Pages Functions do not store boards.
+In hosted mode the [board](#board) saves to each browser's `localStorage`.
 
 One Pages project can serve several apps, such as separate Storybooks for different apps.
 Pick the app with the `<app>` path segment.
