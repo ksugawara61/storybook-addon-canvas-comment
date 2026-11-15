@@ -195,7 +195,11 @@ The board can list the components of a design system, such as a `@acme/ui` packa
 Drag one onto a frame to show where it should go.
 The board renders the component's story in place, and writes an instruction to add it, with its import, to the Markdown for coding agents.
 
-![The Components panel next to a frame, with an Alert and a Checkbox from the example design system placed on the sign-up form](docs/images/board-components.png)
+![Dragging an Alert and a Checkbox from the Components panel onto the sign-up form, giving them args and notes, and the Markdown handed to a coding agent](docs/images/board-components.gif)
+
+The demo searches the **Components** panel of the example design system and drags an Alert above the sign-up form.
+It drops a Checkbox on the form, gives it args and a note, and moves the Alert.
+It then shows the Markdown the board writes for a coding agent.
 
 List the design systems in the preset options.
 Each one is a set of stories: the stories under a title prefix in this Storybook, or the stories of a [composed Storybook](https://storybook.js.org/docs/sharing/storybook-composition).
