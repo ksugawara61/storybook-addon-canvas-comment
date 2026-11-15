@@ -18,11 +18,8 @@ export default defineConfig([
     format: ["esm"],
     dts,
     outDir: "dist",
+    // src/manager.tsx uses the classic JSX runtime and imports React itself.
     external: ["storybook", "react", "@storybook/icons"],
-    banner: {
-      // Storybook manager bundles with classic JSX runtime — react must be in scope.
-      js: 'import React from "react";',
-    },
   },
   {
     entry: { preview: "src/preview.ts" },
