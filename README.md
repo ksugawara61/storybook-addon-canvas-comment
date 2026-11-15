@@ -27,6 +27,7 @@ The board writes those instructions as Markdown for a coding agent.
 3. The **UI Feedback** panel lists every comment with its accessibility anchor and selector. **Complete review** signals a waiting agent.
 
 The demo runs the example Storybook in [`examples/react-vite`](examples/react-vite).
+The [Board](#board) section has a demo of the board page.
 
 ## Features
 
@@ -158,7 +159,11 @@ Pass `--no-reset` to skip the reset. Other options:
 The board compares stories side by side and collects fix instructions across them.
 Open it at `/?path=/board/`, or press **+ Board** in the toolbar of a story to add that story and open the board.
 
-![Board with two SignupForm variants and a duplicated frame with a moved button, a comment and a note](docs/images/board.png)
+![Adding stories to the board, duplicating a frame, moving and commenting on elements, leaving a note, and the Markdown handed to a coding agent](docs/images/board-demo.gif)
+
+The demo adds two SignupForm stories and duplicates one of them.
+In the copy, it moves the **Sign up** button and comments on the heading.
+It then leaves a note and shows the Markdown the board writes for a coding agent.
 
 | Action | How |
 | --- | --- |
@@ -221,6 +226,8 @@ Use **Copy as Markdown** to hand the instructions over.
 The board reads each frame's DOM directly, so the manager and the preview must be served from the same origin.
 That is the default for `storybook dev` and `storybook build`.
 Every frame is a separate iframe, so keep a board to the stories you want to compare.
+Keep the Storybook sidebar shown while you use the board.
+With the sidebar hidden, Storybook places addon pages (and its own settings pages) in the wrong part of the window.
 
 To leave out the board page and the **+ Board** button, turn the board off in the preset options:
 

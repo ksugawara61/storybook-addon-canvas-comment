@@ -11,6 +11,7 @@
   **+ Board** in the story toolbar adds the current story to the board.
   Turn it off with the preset option `board: false`.
   Ignore the whole `.storybook/canvas-comments/` directory in git, not only `comments.json`.
+  The README shows the board in a demo GIF.
 - The example Storybook has story variants to compare on the board, and its cards fit a 390px-wide frame.
 - Fix the toolbar buttons and panel crashing in projects that use React 19.
   The manager bundle imported `react/jsx-runtime`, so Storybook bundled the project's React 19 copy, which does not work with the manager's React 18.
