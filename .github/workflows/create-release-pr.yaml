@@ -1,0 +1,63 @@
+name: Create Release PR
+on:
+  workflow_dispatch:
+    inputs:
+      semver:
+        description: "Version bump (major / minor / patch / pre*)"
+        required: true
+        type: choice
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
+          - prepatch
+          - preminor
+          - premajor
+          - prerelease
+
+permissions:
+  contents: read
+
+jobs:
+  create-release-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".node-version"
+      - name: Bump version
+        id: version
+        env:
+          SEMVER: ${{ inputs.semver }}
+        run: |
+          npm version "$SEMVER" --no-git-tag-version --preid=beta
+          echo "version=$(node -p 'require("./package.json").version')" >> "$GITHUB_OUTPUT"
+      - name: Move Unreleased changes under the new version in CHANGELOG.md
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: sed -i "0,/^## Unreleased$/s//## Unreleased\n\n## ${VERSION}/" CHANGELOG.md
+      - name: Create release PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          BASE: ${{ github.ref_name }}
+        run: |
+          branch="release/v${VERSION}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add package.json CHANGELOG.md
+          git commit -m "chore(release): v${VERSION}"
+          git push origin "$branch"
+          notes=$(gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+            -f tag_name="v${VERSION}" -f target_commitish="$BASE" --jq .body)
+          gh label create "Type: Release" --color "0e8a16" \
+            --description "Merging publishes the package to npm" --force
+          gh pr create --base "$BASE" --head "$branch" \
+            --title "Release v${VERSION}" --label "Type: Release" \
+            --body "$(printf 'Merging this PR publishes `v%s` to npm and creates the GitHub Release.\n\n%s' "$VERSION" "$notes")"

@@ -491,6 +491,20 @@ pnpm build
 Try a local change in another project with a `link:` or `file:` dependency on your checkout.
 Run `pnpm build` after each change, because the consumer loads `dist/`.
 
+## Releasing
+
+CI publishes to npm with [Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (OIDC), so the repository holds no npm token.
+
+1. Run the **Create Release PR** workflow from the Actions tab and pick `patch`, `minor`, `major`, or a prerelease bump.
+   It bumps `package.json`, moves the `Unreleased` notes in `CHANGELOG.md` under the new version, and opens a PR labeled `Type: Release`.
+2. Review the PR and merge it.
+   The **Release** workflow (`.github/workflows/release.yaml`) then runs the checks, publishes to npm with provenance, and creates the `vX.Y.Z` tag and GitHub Release.
+   Prereleases go to the `next` dist-tag.
+
+One-time setup on npmjs.com, under the package's **Settings → Trusted Publisher**: choose GitHub Actions and enter
+owner `ksugawara61`, repository `storybook-addon-canvas-comment`, and workflow `release.yaml`.
+After that, set **Publishing access** to "Require two-factor authentication and disallow tokens".
+
 ## Contributing
 
 Bug reports and pull requests are welcome on GitHub at https://github.com/ksugawara61/storybook-addon-canvas-comment.

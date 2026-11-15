@@ -1,0 +1,81 @@
+# Publishes to npm with Trusted Publishing (OIDC). No NPM_TOKEN is used.
+# The npm package's Trusted Publisher must point at this repository and this
+# workflow file name (release.yaml).
+name: Release
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    if: >-
+      github.event.pull_request.merged &&
+      contains(github.event.pull_request.labels.*.name, 'Type: Release')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the tag and the GitHub Release
+      id-token: write # OIDC token for npm Trusted Publishing
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          run_install: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".node-version"
+          cache: pnpm
+          registry-url: "https://registry.npmjs.org"
+      # Trusted Publishing needs npm CLI 11.5.1 or later; Node 22 bundles npm 10.
+      - name: Update npm
+        run: npm install -g npm@11
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Test
+        run: pnpm test
+      - name: Build
+        run: pnpm build
+      - name: Read package version
+        id: package
+        run: |
+          name=$(node -p 'require("./package.json").name')
+          version=$(node -p 'require("./package.json").version')
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          if npm view "${name}@${version}" version > /dev/null 2>&1; then
+            echo "${name}@${version} is already on npm"
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Publish to npm
+        if: steps.package.outputs.published == 'false'
+        env:
+          VERSION: ${{ steps.package.outputs.version }}
+        # Provenance is attached automatically when publishing via Trusted Publishing.
+        # Prereleases (e.g. 1.0.0-beta.0) go to the "next" dist-tag.
+        run: |
+          if [[ "$VERSION" == *-* ]]; then
+            npm publish --access public --tag next
+          else
+            npm publish --access public
+          fi
+      - name: Create tag and GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.package.outputs.version }}
+          SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          if gh release view "v${VERSION}" > /dev/null 2>&1; then
+            echo "Release v${VERSION} already exists"
+            exit 0
+          fi
+          prerelease=()
+          [[ "$VERSION" == *-* ]] && prerelease=(--prerelease)
+          gh release create "v${VERSION}" --target "$SHA" --title "v${VERSION}" \
+            --generate-notes "${prerelease[@]}"
