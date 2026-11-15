@@ -11,7 +11,7 @@
   "dependencies": {
     "dom-accessibility-api": "^0.6.3"
   },
-  "description": "Storybook addon for inline UI feedback on the canvas — click to annotate, review in a panel, and hand structured context to coding agents via a filesystem dom-map.",
+  "description": "Storybook addon for inline UI feedback on the canvas — click to annotate, compare stories on a board, review in a panel, and hand structured context to coding agents via a filesystem dom-map.",
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20251011.0",
     "@storybook/icons": "2.2.0",
@@ -60,7 +60,8 @@
     "ui-feedback",
     "ai-agent",
     "design-review",
-    "dom-map"
+    "dom-map",
+    "board"
   ],
   "license": "MIT",
   "main": "./dist/index.js",

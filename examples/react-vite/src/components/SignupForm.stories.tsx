@@ -11,3 +11,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const ShortTitle: Story = {
+  args: { title: "Start your free trial" },
+};

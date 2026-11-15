@@ -2,6 +2,12 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { fileURLToPath } from "node:url";
 import { mergeConfig, type Plugin, type UserConfig } from "vite";
 import {
+  type BoardPaths,
+  createBoardPaths,
+  handleBoardRequest,
+} from "./board/api.ts";
+import { BOARD_API_PATH } from "./board/constants.ts";
+import {
   createCanvasCommentReply,
   isCanvasComment,
   readCanvasCommentReplyInput,
@@ -22,10 +28,28 @@ const managerEntry = fileURLToPath(
 const previewEntry = fileURLToPath(
   new URL(isSource ? "./preview.ts" : "./preview.js", import.meta.url),
 );
+const boardManagerEntry = fileURLToPath(
+  new URL(
+    isSource ? "./board/manager.tsx" : "./board-manager.js",
+    import.meta.url,
+  ),
+);
 
-export const managerEntries = (entries: string[] = []) => [
+/** Options passed to the preset with `addons: [{ name, options }]`. */
+export type CanvasCommentsPresetOptions = {
+  /** Hosted comments API (see "Hosted mode" in the README). */
+  apiUrl?: string;
+  /** Set to `false` to leave out the board page and its "Add to board" toolbar button. */
+  board?: boolean;
+};
+
+export const managerEntries = (
+  entries: string[] = [],
+  options: CanvasCommentsPresetOptions = {},
+) => [
   ...entries,
   managerEntry,
+  ...(options.board === false ? [] : [boardManagerEntry]),
 ];
 
 export const previewAnnotations = (entries: string[] = []) => [
@@ -35,7 +59,7 @@ export const previewAnnotations = (entries: string[] = []) => [
 
 export const env = (
   existing: Record<string, string> = {},
-  options: { apiUrl?: string } = {},
+  options: CanvasCommentsPresetOptions = {},
 ): Record<string, string> => ({
   ...existing,
   ...(options.apiUrl ? { CANVAS_COMMENTS_API_URL: options.apiUrl } : {}),
@@ -224,7 +248,13 @@ const handleRequest = async (
   pathname: string,
   adapter: StorageAdapter,
   reviewStore: FsReviewStore,
+  boardPaths: BoardPaths,
 ) => {
+  if (pathname === BOARD_API_PATH) {
+    await handleBoardRequest(req, res, boardPaths);
+    return;
+  }
+
   if (pathname === REVIEW_API_PATH) {
     await handleReviewRequest(req, res, reviewStore);
     return;
@@ -266,6 +296,7 @@ const handleRequest = async (
 const canvasCommentsApi = (): Plugin => {
   const adapter: StorageAdapter = new FsAdapter();
   const reviewStore = new FsReviewStore();
+  const boardPaths = createBoardPaths();
 
   return {
     configureServer(server) {
@@ -279,7 +310,14 @@ const canvasCommentsApi = (): Plugin => {
 
         void (async () => {
           try {
-            await handleRequest(req, res, pathname, adapter, reviewStore);
+            await handleRequest(
+              req,
+              res,
+              pathname,
+              adapter,
+              reviewStore,
+              boardPaths,
+            );
           } catch (error: unknown) {
             const message =
               error instanceof Error ? error.message : "Unknown server error";
@@ -294,7 +332,7 @@ const canvasCommentsApi = (): Plugin => {
 
 export const viteFinal = async (
   config: UserConfig,
-  options: { apiUrl?: string } = {},
+  options: CanvasCommentsPresetOptions = {},
 ): Promise<UserConfig> =>
   mergeConfig(config, {
     define: {
@@ -303,5 +341,6 @@ export const viteFinal = async (
     plugins: [canvasCommentsApi()],
   });
 
+export type { BoardFile } from "./board/board-schema.ts";
 export type { CanvasCommentsPluginOptions } from "./vite-plugin.ts";
 export { canvasCommentsPlugin } from "./vite-plugin.ts";
