@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.2
+
 ## 0.1.1
 
 - Publish to npm from CI with Trusted Publishing (OIDC) instead of an `NPM_TOKEN`.
