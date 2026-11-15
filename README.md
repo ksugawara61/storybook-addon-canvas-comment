@@ -50,8 +50,9 @@ npm install -D storybook-addon-canvas-comments
 yarn add -D storybook-addon-canvas-comments
 ```
 
-The published package ships a built `dist/`, so it runs no build script on install.
-pnpm needs no `allowBuilds` entry for it.
+The release workflow builds `dist/` and ships it in the npm package.
+The package has no install-time scripts (`preinstall`, `install`, `postinstall`, or `prepare`).
+So pnpm needs no `allowBuilds` entry for it.
 
 ## Setup
 
@@ -473,7 +474,7 @@ The skill reads that file first and follows it.
 ## Development
 
 ```bash
-pnpm install   # also builds dist/ through the prepare script
+pnpm install
 pnpm typecheck
 pnpm test
 pnpm build
@@ -481,10 +482,6 @@ pnpm build
 
 Try a local change in another project with a `link:` or `file:` dependency on your checkout.
 Run `pnpm build` after each change, because the consumer loads `dist/`.
-
-The repository needs no `allowBuilds` entry either.
-No dependency needs its install script, so `pnpm-workspace.yaml` sets `strictDepBuilds: false`.
-pnpm then skips those scripts with a warning instead of failing the install.
 
 ## Releasing
 

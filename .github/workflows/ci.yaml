@@ -19,7 +19,6 @@ jobs:
         with:
           node-version-file: ".node-version"
           cache: pnpm
-      # prepare (tsup) also runs here, so install doubles as a build check
       - run: pnpm install --frozen-lockfile
       - name: Typecheck
         run: pnpm typecheck
@@ -28,4 +27,6 @@ jobs:
       - name: Build
         run: pnpm build
       - name: Verify package contents
-        run: pnpm pack --dry-run
+        run: |
+          pnpm pack --pack-destination "$RUNNER_TEMP"
+          node .github/scripts/verify-package.mjs "$RUNNER_TEMP"/storybook-addon-canvas-comments-*.tgz
