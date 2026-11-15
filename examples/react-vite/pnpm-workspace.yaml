@@ -1,0 +1,5 @@
+# This example is its own pnpm project, separate from the addon at the repository root.
+minimumReleaseAge: 4320
+
+allowBuilds:
+  esbuild: true
