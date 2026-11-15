@@ -40,27 +40,19 @@ The agent then receives all open comments as structured JSON.
 
 ## Installation
 
-The package is not on npm yet. Install it from GitHub as a git dependency.
-Pin a tag or a commit so installs stay reproducible:
+Install the package from npm as a dev dependency:
 
 ```bash
-pnpm add -D github:ksugawara61/storybook-addon-canvas-comment#<tag-or-commit>
-# npm / yarn work the same way
-npm install -D github:ksugawara61/storybook-addon-canvas-comment#<tag-or-commit>
+pnpm add -D storybook-addon-canvas-comments
+# or
+npm install -D storybook-addon-canvas-comments
+# or
+yarn add -D storybook-addon-canvas-comments
 ```
 
-The repository does not commit `dist/`.
-The package manager runs the `prepare` script (`tsup`) after it clones the repository, and that builds `dist/`.
-pnpm 10 and later only run scripts of dependencies you allow.
-Allow this package and `esbuild` (which `tsup` uses) in `pnpm-workspace.yaml`:
-
-```yaml
-allowBuilds:
-  esbuild: true
-  storybook-addon-canvas-comments: true
-```
-
-The package name stays `storybook-addon-canvas-comments`, so imports and the addon name do not change once it is published to npm.
+The release workflow builds `dist/` and ships it in the npm package.
+The package has no install-time scripts (`preinstall`, `install`, `postinstall`, or `prepare`).
+So pnpm needs no `allowBuilds` entry for it.
 
 ## Setup
 
@@ -482,7 +474,7 @@ The skill reads that file first and follows it.
 ## Development
 
 ```bash
-pnpm install   # also builds dist/ through the prepare script
+pnpm install
 pnpm typecheck
 pnpm test
 pnpm build

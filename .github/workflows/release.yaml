@@ -72,9 +72,15 @@ jobs:
       - name: Test
         if: steps.tag-check.outputs.exists == 'false'
         run: pnpm test
+      # prepack (tsup) builds dist/ again when npm packs the tarball.
+      - name: Build and verify package contents
+        if: steps.tag-check.outputs.exists == 'false'
+        run: |
+          pnpm build
+          npm pack --pack-destination "$RUNNER_TEMP"
+          node .github/scripts/verify-package.mjs "$RUNNER_TEMP"/storybook-addon-canvas-comments-*.tgz
       # The Trusted Publisher only allows `npm stage publish`. The version stays
       # private until a maintainer approves it with 2FA (`npm stage approve`).
-      # prepare (tsup) builds dist/ before staging.
       - name: Stage the package on npm with provenance
         if: steps.tag-check.outputs.exists == 'false'
         env:

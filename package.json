@@ -82,7 +82,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit && tsc --noEmit -p src/cloudflare/tsconfig.json",
     "wait-comments": "tsx src/cli/wait-comments.ts",
-    "prepare": "tsup"
+    "prepack": "tsup"
   },
   "storybook": {
     "displayName": "Canvas Comments",

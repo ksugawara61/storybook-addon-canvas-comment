@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- The package is on npm. Install it with `pnpm add -D storybook-addon-canvas-comments` instead of from GitHub.
+- Build `dist/` in a `prepack` script instead of `prepare`.
+  The published package has no install-time scripts, so projects that install it need no `allowBuilds` entry.
+  Installing from git no longer builds `dist/`. Install from npm instead.
+
 ## 0.1.2
 
 ## 0.1.1
