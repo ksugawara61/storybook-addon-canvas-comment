@@ -40,27 +40,18 @@ The agent then receives all open comments as structured JSON.
 
 ## Installation
 
-The package is not on npm yet. Install it from GitHub as a git dependency.
-Pin a tag or a commit so installs stay reproducible:
+Install the package from npm as a dev dependency:
 
 ```bash
-pnpm add -D github:ksugawara61/storybook-addon-canvas-comment#<tag-or-commit>
-# npm / yarn work the same way
-npm install -D github:ksugawara61/storybook-addon-canvas-comment#<tag-or-commit>
+pnpm add -D storybook-addon-canvas-comments
+# or
+npm install -D storybook-addon-canvas-comments
+# or
+yarn add -D storybook-addon-canvas-comments
 ```
 
-The repository does not commit `dist/`.
-The package manager runs the `prepare` script (`tsup`) after it clones the repository, and that builds `dist/`.
-pnpm 10 and later only run scripts of dependencies you allow.
-Allow this package and `esbuild` (which `tsup` uses) in `pnpm-workspace.yaml`:
-
-```yaml
-allowBuilds:
-  esbuild: true
-  storybook-addon-canvas-comments: true
-```
-
-The package name stays `storybook-addon-canvas-comments`, so imports and the addon name do not change once it is published to npm.
+The published package ships a built `dist/`, so it runs no build script on install.
+pnpm needs no `allowBuilds` entry for it.
 
 ## Setup
 
@@ -490,6 +481,10 @@ pnpm build
 
 Try a local change in another project with a `link:` or `file:` dependency on your checkout.
 Run `pnpm build` after each change, because the consumer loads `dist/`.
+
+The repository needs no `allowBuilds` entry either.
+No dependency needs its install script, so `pnpm-workspace.yaml` sets `strictDepBuilds: false`.
+pnpm then skips those scripts with a warning instead of failing the install.
 
 ## Releasing
 

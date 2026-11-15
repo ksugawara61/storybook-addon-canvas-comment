@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- The package is on npm. Install it with `pnpm add -D storybook-addon-canvas-comments` instead of from GitHub.
+  It needs no `allowBuilds` entry in `pnpm-workspace.yaml`.
+- `pnpm install` in this repository works without `allowBuilds`.
+
 ## 0.1.2
 
 ## 0.1.1

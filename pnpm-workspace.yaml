@@ -1,4 +1,9 @@
 allowBuilds:
-  esbuild: true
+  esbuild: set this to true or false
 
 minimumReleaseAge: 4320
+
+# No dependency needs its install script. esbuild's postinstall only checks
+# its binary, which comes from the @esbuild/* optional dependency anyway.
+# Do not fail the install on the skipped scripts, so no allowBuilds is needed.
+strictDepBuilds: false
