@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Publish to npm from CI with Trusted Publishing (OIDC) instead of an `NPM_TOKEN`.
+  Releases go through a draft release PR labeled `Type: Release` (see "Releasing" in the README).
 - Add a Claude Code plugin marketplace with the `canvas-comments` plugin.
   Its `canvas-issues` skill files the open canvas comments as GitHub issues, one per feature.
   It comes from the curio repository and no longer assumes curio's layout.

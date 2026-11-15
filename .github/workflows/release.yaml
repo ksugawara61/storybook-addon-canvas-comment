@@ -1,0 +1,128 @@
+# Publishes to npm with Trusted Publishing (OIDC). No NPM_TOKEN is used.
+# On npmjs.com, the package's Trusted Publisher points at this repository,
+# this workflow file (release.yaml), and the "npm" environment.
+name: Release
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    if: >-
+      github.event.pull_request.merged == true &&
+      contains(github.event.pull_request.labels.*.name, 'Type: Release')
+    runs-on: ubuntu-latest
+    # Add required reviewers to this environment to gate every publish.
+    environment: npm
+    permissions:
+      contents: write # create the tag and the GitHub Release
+      id-token: write # OIDC token for npm Trusted Publishing
+      pull-requests: write # comment the result on the release PR
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          persist-credentials: false
+      - name: Get package info
+        id: package
+        run: |
+          echo "version=$(jq -r '.version' package.json)" >> "$GITHUB_OUTPUT"
+          echo "name=$(jq -r '.name' package.json)" >> "$GITHUB_OUTPUT"
+      # Re-running after a successful release does nothing.
+      - name: Check if the release exists
+        id: tag-check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" > /dev/null 2>&1; then
+            echo "Tag v$VERSION already exists"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        if: steps.tag-check.outputs.exists == 'false'
+        with:
+          run_install: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: steps.tag-check.outputs.exists == 'false'
+        with:
+          node-version-file: ".node-version"
+          cache: pnpm
+          registry-url: "https://registry.npmjs.org"
+      # Trusted Publishing needs npm CLI 11.5.1 or later; Node 22 bundles npm 10.
+      - name: Install latest npm
+        if: steps.tag-check.outputs.exists == 'false'
+        run: |
+          echo "Current npm version: $(npm -v)"
+          npm install -g npm@latest
+          echo "Updated npm version: $(npm -v)"
+      - name: Install dependencies
+        if: steps.tag-check.outputs.exists == 'false'
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        if: steps.tag-check.outputs.exists == 'false'
+        run: pnpm typecheck
+      - name: Test
+        if: steps.tag-check.outputs.exists == 'false'
+        run: pnpm test
+      - name: Publish to npm with provenance
+        if: steps.tag-check.outputs.exists == 'false'
+        env:
+          NAME: ${{ steps.package.outputs.name }}
+          VERSION: ${{ steps.package.outputs.version }}
+        # prepare (tsup) builds dist/ before publishing.
+        # Skip when this version is already on npm (a retry after a failed GitHub Release step).
+        run: |
+          if npm view "$NAME@$VERSION" version > /dev/null 2>&1; then
+            echo "$NAME@$VERSION is already on npm"
+          else
+            npm publish --provenance --access public
+          fi
+      - name: Create GitHub Release with tag
+        id: create-release
+        if: steps.tag-check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.package.outputs.version }}
+          SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          RELEASE_URL=$(gh release create "v$VERSION" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "v$VERSION" \
+            --target "$SHA" \
+            --notes "$PR_BODY")
+          echo "url=$RELEASE_URL" >> "$GITHUB_OUTPUT"
+      - name: Comment on PR - Success
+        if: success() && steps.tag-check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          VERSION: ${{ steps.package.outputs.version }}
+          PACKAGE_NAME: ${{ steps.package.outputs.name }}
+          RELEASE_URL: ${{ steps.create-release.outputs.url }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body "✅ **Release v$VERSION completed successfully!**
+
+          - 📦 npm package: https://www.npmjs.com/package/$PACKAGE_NAME/v/$VERSION
+          - 🏷️ GitHub Release: $RELEASE_URL
+          - 🔗 Workflow run: $RUN_URL"
+      - name: Comment on PR - Failure
+        if: failure() && steps.tag-check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          VERSION: ${{ steps.package.outputs.version }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body "❌ **Release v$VERSION failed**
+
+          Please check the workflow logs for details.
+          🔗 Workflow run: $RUN_URL"
