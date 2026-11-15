@@ -504,6 +504,8 @@ CI publishes to npm with [Trusted Publishing](https://docs.npmjs.com/trusted-pub
    It runs the checks, stages the package on npm with provenance (`npm stage publish`), creates the `vX.Y.Z` tag and GitHub Release, and comments the result on the PR.
    Re-running it after a release that succeeded does nothing.
 4. Approve the staged version with 2FA. Until then it is not public.
+   On npmjs.com, open the **Staged Packages** tab in your account settings, review the version, and click **Approve**.
+   Or use the CLI (npm 11.15.0 or later):
 
    ```bash
    npm stage list storybook-addon-canvas-comments

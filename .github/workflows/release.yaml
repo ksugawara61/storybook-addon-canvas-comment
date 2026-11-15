@@ -113,6 +113,8 @@ jobs:
         run: |
           gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body "📦 **v$VERSION is staged on npm. Approve it to publish.**
 
+          Approve it in the **Staged Packages** tab of your npmjs.com account settings, or with the CLI:
+
           \`\`\`sh
           npm stage list $PACKAGE_NAME
           npm stage approve <stage-id>   # asks for 2FA
