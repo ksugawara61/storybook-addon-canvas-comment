@@ -495,15 +495,33 @@ Run `pnpm build` after each change, because the consumer loads `dist/`.
 
 CI publishes to npm with [Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (OIDC), so the repository holds no npm token.
 
-1. Run the **Create Release PR** workflow from the Actions tab and pick `patch`, `minor`, `major`, or a prerelease bump.
-   It bumps `package.json`, moves the `Unreleased` notes in `CHANGELOG.md` under the new version, and opens a PR labeled `Type: Release`.
-2. Review the PR and merge it.
-   The **Release** workflow (`.github/workflows/release.yaml`) then runs the checks, publishes to npm with provenance, and creates the `vX.Y.Z` tag and GitHub Release.
-   Prereleases go to the `next` dist-tag.
+1. Run the **Create Release PR** workflow from the Actions tab and pick `patch`, `minor`, or `major`.
+   It bumps `package.json`, moves the `Unreleased` notes in `CHANGELOG.md` under the new version, and opens a draft PR labeled `Type: Release`.
+   The PR body holds release notes generated since the previous release.
+2. Edit the PR body if needed. It becomes the GitHub Release notes.
+3. Mark the PR ready and merge it.
+   The **Release** workflow (`.github/workflows/release.yaml`) runs in the `npm` environment.
+   It runs the checks, publishes to npm with provenance, creates the `vX.Y.Z` tag and GitHub Release, and comments the result on the PR.
+   Re-running it after a release that succeeded does nothing.
 
-One-time setup on npmjs.com, under the package's **Settings → Trusted Publisher**: choose GitHub Actions and enter
-owner `ksugawara61`, repository `storybook-addon-canvas-comment`, and workflow `release.yaml`.
-After that, set **Publishing access** to "Require two-factor authentication and disallow tokens".
+PRs opened by `GITHUB_TOKEN` do not trigger other workflows, so CI does not run on the release PR by itself.
+The Release workflow runs the same checks before publishing.
+
+### One-time setup
+
+- **GitHub:** turn on **Settings → Actions → General → Allow GitHub Actions to create and approve pull requests**.
+- **GitHub (optional):** add required reviewers to the `npm` environment under **Settings → Environments** to approve every publish by hand.
+  Protect `main` with "Require review from Code Owners" so changes to `.github/workflows/` need the owner's review (see `.github/CODEOWNERS`).
+- **npm:** a package must exist on npm before it can have a Trusted Publisher.
+  For the first release, publish a placeholder once, for example with `npx setup-npm-trusted-publish storybook-addon-canvas-comments`.
+- **npm:** under the package's **Settings → Trusted Publisher**, choose GitHub Actions and enter:
+  - Organization or user: `ksugawara61`
+  - Repository: `storybook-addon-canvas-comment`
+  - Workflow filename: `release.yaml`
+  - Environment name: `npm`
+- **npm:** set **Publishing access** to "Require two-factor authentication and disallow tokens".
+
+If publishing fails with `422 Unprocessable Entity`, check the Trusted Publisher settings and that `repository.url` in `package.json` matches this repository.
 
 ## Contributing
 
