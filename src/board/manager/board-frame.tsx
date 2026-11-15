@@ -5,14 +5,21 @@
 /** @jsxRuntime classic */
 import React, {
   type PointerEvent as ReactPointerEvent,
+  useEffect,
   useRef,
   useState,
 } from "react";
 import { useTheme } from "storybook/theming";
-import type { BoardFrame as Frame, ElementEdit } from "../board-schema.ts";
+import type {
+  ComponentPlacement,
+  BoardFrame as Frame,
+  ElementEdit,
+} from "../board-schema.ts";
 import { duplicateFrame, removeFrame, updateFrame } from "../board-state.ts";
-import { ELEMENT_ACCENT } from "../constants.ts";
+import { COMPONENT_ACCENT, ELEMENT_ACCENT } from "../constants.ts";
+import { BoardComponent } from "./board-component.tsx";
 import { startDrag } from "./drag.ts";
+import { setFrameDocument } from "./frame-documents.ts";
 import { updateActiveBoard } from "./store.ts";
 import type { BoardMode } from "./types.ts";
 import { useAppliedEdits, useElementEditor } from "./use-frame-document.ts";
@@ -30,40 +37,50 @@ const buildFrameUrl = (frame: Frame): string => {
 };
 
 type Props = {
+  components: ComponentPlacement[];
+  /** Highlights the frame while a library component is dragged over it. */
+  dropTarget: boolean;
   edits: ElementEdit[];
   frame: Frame;
   interactionLocked: boolean;
   mode: BoardMode;
   onDragChange: (dragging: boolean) => void;
   onSelect: () => void;
-  onSelectEdit: (editId: string) => void;
+  /** Selects an element instruction or a placed component. */
+  onSelectItem: (itemId: string) => void;
   selected: boolean;
-  selectedEditId: string | undefined;
+  selectedItemId: string | undefined;
   zoom: number;
 };
 
 export const BoardFrame = ({
+  components,
+  dropTarget,
   edits,
   frame,
   interactionLocked,
   mode,
   onDragChange,
   onSelect,
-  onSelectEdit,
+  onSelectItem,
   selected,
-  selectedEditId,
+  selectedItemId,
   zoom,
 }: Props) => {
   const theme = useTheme();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [doc, setDoc] = useState<Document | null>(null);
-  useAppliedEdits(doc, edits, selectedEditId);
+  useEffect(() => {
+    setFrameDocument(frame.id, doc);
+    return () => setFrameDocument(frame.id, null);
+  }, [doc, frame.id]);
+  useAppliedEdits(doc, edits, selectedItemId);
   useElementEditor({
     doc,
     edits,
     enabled: mode === "element",
     frameId: frame.id,
-    onSelectEdit,
+    onSelectEdit: onSelectItem,
   });
 
   const dragFrame =
@@ -111,9 +128,11 @@ export const BoardFrame = ({
       <div
         style={{
           background: "#fff",
-          boxShadow: selected
-            ? `0 0 0 2px ${accent}`
-            : `0 0 0 1px ${theme.appBorderColor}, 0 4px 16px rgba(0,0,0,0.08)`,
+          boxShadow: dropTarget
+            ? `0 0 0 3px ${COMPONENT_ACCENT}`
+            : selected
+              ? `0 0 0 2px ${accent}`
+              : `0 0 0 1px ${theme.appBorderColor}, 0 4px 16px rgba(0,0,0,0.08)`,
           height: frame.height,
           position: "relative",
           width: frame.width,
@@ -139,6 +158,18 @@ export const BoardFrame = ({
             style={{ cursor: "move", inset: 0, position: "absolute" }}
           />
         ) : null}
+        {components.map((component, index) => (
+          <BoardComponent
+            component={component}
+            index={index}
+            key={component.id}
+            mode={mode}
+            onDragChange={onDragChange}
+            onSelect={() => onSelectItem(component.id)}
+            selected={component.id === selectedItemId}
+            zoom={zoom}
+          />
+        ))}
         <button
           aria-label="Resize"
           onPointerDown={resizeFrame}

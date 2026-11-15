@@ -25,22 +25,25 @@ type Props = {
   board: Board | undefined;
   mode: BoardMode;
   onModeChange: (mode: BoardMode) => void;
-  onSelectEdit: (editId: string | undefined) => void;
+  /** The frame a library component is dragged over. */
+  dropFrameId: string | undefined;
+  onSelectItem: (itemId: string | undefined) => void;
   onSelectFrame: (frameId: string | undefined) => void;
   onViewportChange: (update: (viewport: Viewport) => Viewport) => void;
-  selectedEditId: string | undefined;
+  selectedItemId: string | undefined;
   selectedFrameId: string | undefined;
   viewport: Viewport;
 };
 
 export const BoardCanvas = ({
   board,
+  dropFrameId,
   mode,
   onModeChange,
-  onSelectEdit,
   onSelectFrame,
+  onSelectItem,
   onViewportChange,
-  selectedEditId,
+  selectedItemId,
   selectedFrameId,
   viewport,
 }: Props) => {
@@ -109,7 +112,7 @@ export const BoardCanvas = ({
       return;
     }
     onSelectFrame(undefined);
-    onSelectEdit(undefined);
+    onSelectItem(undefined);
     const element = event.currentTarget;
     const { pointerId } = event;
     const start = { x: event.clientX, y: event.clientY };
@@ -176,18 +179,22 @@ export const BoardCanvas = ({
             }}
           >
             <BoardFrame
+              components={board.components.filter(
+                (component) => component.frameId === frame.id,
+              )}
+              dropTarget={frame.id === dropFrameId}
               edits={board.edits.filter((edit) => edit.frameId === frame.id)}
               frame={frame}
               interactionLocked={dragging}
               mode={mode}
               onDragChange={setDragging}
               onSelect={() => onSelectFrame(frame.id)}
-              onSelectEdit={(editId) => {
+              onSelectItem={(itemId) => {
                 onSelectFrame(frame.id);
-                onSelectEdit(editId);
+                onSelectItem(itemId);
               }}
               selected={frame.id === selectedFrameId}
-              selectedEditId={selectedEditId}
+              selectedItemId={selectedItemId}
               zoom={viewport.zoom}
             />
           </div>

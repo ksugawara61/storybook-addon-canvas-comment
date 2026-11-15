@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add design system components to the board.
+  List design systems with the preset option `designSystems`: the stories under a title prefix, or the stories of a composed Storybook (`refs`).
+  The board's **Components** panel lists their components, and you drag a story onto a frame to place the component there.
+  Placed components render their story, can be moved, resized and given args and a note, and are copied when the frame is duplicated.
+  The instructions for coding agents list them under "Components to add", with the import, the story, the position and the element they were dropped on.
+- The example Storybook has a small design system (`src/ui`, imported as `@example/ui`) to try the component library with.
+
 ## 0.2.0
 
 - Add a board page (`/?path=/board/`) for comparing stories side by side.

@@ -10,6 +10,7 @@ import type { BoardFile } from "./board-schema";
 const boardFile: BoardFile = {
   boards: [
     {
+      components: [],
       edits: [
         {
           createdAt: "2026-11-15T00:00:00.000Z",

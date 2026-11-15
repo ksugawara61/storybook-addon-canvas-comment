@@ -32,6 +32,16 @@ The stories come in variants to compare: `Button` (Primary / Secondary), `Produc
 3. Switch to **Element** (`E`), drag the **Sign up** button in the copy, and type what to change in the side panel.
 4. Switch to **Note** (`N`) and click the board to leave a note.
 
+### Add components from the design system
+
+`src/ui` is a small design system, imported as `@example/ui` (see `.storybook/main.ts` and `tsconfig.json`).
+Its stories are titled `UI/…`, and the `designSystems` preset option makes the board list them in the **Components** panel.
+
+1. Press **Components** in the board toolbar if the panel is hidden.
+2. Drag **Checkbox → Unchecked** onto the SignupForm frame, between the Email field and the buttons.
+3. Drag **Alert → Danger** above the form, and type in the side panel when it should show.
+4. In the side panel, give the Checkbox args such as `label:I agree to the Terms` to change its text.
+
 The board is saved to `examples/react-vite/.storybook/canvas-comments/board.json`.
 The instructions for a coding agent are written next to it, to `board-instructions.md`:
 

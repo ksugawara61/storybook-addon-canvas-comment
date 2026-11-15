@@ -1,0 +1,90 @@
+.ui-alert {
+  border: 1px solid;
+  border-radius: 8px;
+  box-sizing: border-box;
+  font-size: 14px;
+  padding: 12px 14px;
+  width: min(360px, 100%);
+}
+
+.ui-alert p {
+  margin: 4px 0 0;
+}
+
+.ui-alert--info {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1e3a8a;
+}
+
+.ui-alert--success {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #14532d;
+}
+
+.ui-alert--danger {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #7f1d1d;
+}
+
+.ui-badge {
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 10px;
+}
+
+.ui-badge--neutral {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.ui-badge--brand {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.ui-badge--success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.ui-checkbox {
+  align-items: center;
+  display: flex;
+  font-size: 14px;
+  gap: 8px;
+}
+
+.ui-checkbox input {
+  accent-color: #4f46e5;
+  height: 16px;
+  margin: 0;
+  width: 16px;
+}
+
+.ui-divider {
+  border: 0;
+  border-top: 1px solid #e5e7eb;
+  margin: 16px 0;
+  width: min(360px, 100%);
+}
+
+div.ui-divider {
+  align-items: center;
+  border: 0;
+  color: #9ca3af;
+  display: flex;
+  font-size: 13px;
+  gap: 12px;
+}
+
+div.ui-divider::before,
+div.ui-divider::after {
+  border-top: 1px solid #e5e7eb;
+  content: "";
+  flex: 1;
+}

@@ -12,9 +12,20 @@ import {
   useState,
 } from "react";
 import { useTheme } from "storybook/theming";
-import type { Board, BoardFrame, ElementEdit } from "../board-schema.ts";
-import { removeEdit, updateEdit, updateFrame } from "../board-state.ts";
-import { ELEMENT_ACCENT } from "../constants.ts";
+import type {
+  Board,
+  BoardFrame,
+  ComponentPlacement,
+  ElementEdit,
+} from "../board-schema.ts";
+import {
+  removeComponent,
+  removeEdit,
+  updateComponent,
+  updateEdit,
+  updateFrame,
+} from "../board-state.ts";
+import { COMPONENT_ACCENT, ELEMENT_ACCENT } from "../constants.ts";
 import { toInstructionsMarkdown } from "../instructions.ts";
 import { updateActiveBoard } from "./store.ts";
 
@@ -26,19 +37,20 @@ const SIZE_PRESETS = [
 
 type Props = {
   board: Board | undefined;
-  onSelectEdit: (editId: string | undefined) => void;
   onSelectFrame: (frameId: string | undefined) => void;
-  selectedEditId: string | undefined;
+  /** Selects an element instruction or a placed component. */
+  onSelectItem: (itemId: string | undefined) => void;
   selectedFrameId: string | undefined;
+  selectedItemId: string | undefined;
   storageLabel: string;
 };
 
 export const SidePanel = ({
   board,
-  onSelectEdit,
   onSelectFrame,
-  selectedEditId,
+  onSelectItem,
   selectedFrameId,
+  selectedItemId,
   storageLabel,
 }: Props) => {
   const theme = useTheme();
@@ -86,10 +98,14 @@ export const SidePanel = ({
         }
         title="Instructions"
       >
-        {board && board.edits.length > 0 ? (
+        {board && (board.edits.length > 0 || board.components.length > 0) ? (
           board.frames
-            .filter((item) =>
-              board.edits.some((edit) => edit.frameId === item.id),
+            .filter(
+              (item) =>
+                board.edits.some((edit) => edit.frameId === item.id) ||
+                board.components.some(
+                  (component) => component.frameId === item.id,
+                ),
             )
             .map((item) => (
               <div key={item.id} style={{ marginBottom: 12 }}>
@@ -117,9 +133,23 @@ export const SidePanel = ({
                       key={edit.id}
                       onSelect={() => {
                         onSelectFrame(item.id);
-                        onSelectEdit(edit.id);
+                        onSelectItem(edit.id);
                       }}
-                      selected={edit.id === selectedEditId}
+                      selected={edit.id === selectedItemId}
+                    />
+                  ))}
+                {board.components
+                  .filter((component) => component.frameId === item.id)
+                  .map((component, index) => (
+                    <ComponentItem
+                      component={component}
+                      index={index}
+                      key={component.id}
+                      onSelect={() => {
+                        onSelectFrame(item.id);
+                        onSelectItem(component.id);
+                      }}
+                      selected={component.id === selectedItemId}
                     />
                   ))}
               </div>
@@ -127,7 +157,8 @@ export const SidePanel = ({
         ) : (
           <p style={{ color: theme.textMutedColor, margin: 0 }}>
             In Element mode, click an element in a frame to comment on it, or
-            drag it to leave a move. Hold Alt to pick its parent.
+            drag it to leave a move. Hold Alt to pick its parent. Drag a
+            component from the Components panel onto a frame to add it.
           </p>
         )}
       </Section>
@@ -325,6 +356,114 @@ const EditItem = ({
         rows={2}
         style={{ ...inputStyle(theme), marginTop: 6, resize: "vertical" }}
         value={edit.note}
+      />
+    </div>
+  );
+};
+
+const ComponentItem = ({
+  component,
+  index,
+  onSelect,
+  selected,
+}: {
+  component: ComponentPlacement;
+  index: number;
+  onSelect: () => void;
+  selected: boolean;
+}) => {
+  const theme = useTheme();
+  const noteRef = useRef<HTMLTextAreaElement>(null);
+  const [args, setArgs] = useState(component.args);
+  useEffect(() => setArgs(component.args), [component.args]);
+  useEffect(() => {
+    if (selected) {
+      noteRef.current?.focus();
+    }
+  }, [selected]);
+  const patch = (
+    value: Parameters<typeof updateComponent>[2],
+  ): void =>
+    updateActiveBoard((board) => updateComponent(board, component.id, value));
+
+  return (
+    <div
+      onFocus={onSelect}
+      style={{
+        border: `1px solid ${selected ? COMPONENT_ACCENT : theme.appBorderColor}`,
+        borderRadius: 4,
+        marginBottom: 6,
+        padding: 8,
+      }}
+    >
+      <div style={{ alignItems: "center", display: "flex", gap: 6 }}>
+        <span
+          style={{
+            background: COMPONENT_ACCENT,
+            borderRadius: 999,
+            color: "#fff",
+            fontSize: 10,
+            fontWeight: 600,
+            minWidth: 16,
+            padding: "1px 4px",
+            textAlign: "center",
+          }}
+        >
+          C{index + 1}
+        </span>
+        <span
+          style={{
+            flex: 1,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+          title={`${component.storyId} from ${component.designSystem}`}
+        >
+          Add {`<${component.componentName}>`} ({component.storyName})
+        </span>
+        <button
+          aria-label="Delete component"
+          onClick={() =>
+            updateActiveBoard((board) => removeComponent(board, component.id))
+          }
+          style={{
+            background: "transparent",
+            border: 0,
+            color: theme.textMutedColor,
+            cursor: "pointer",
+          }}
+          type="button"
+        >
+          ×
+        </button>
+      </div>
+      <div style={{ color: theme.textMutedColor, marginTop: 4 }}>
+        <code>{component.importPath}</code> · x {component.x}px / y{" "}
+        {component.y}px · {component.width}×{component.height}
+        {component.anchorLabel ? ` · over ${component.anchorLabel}` : ""}
+      </div>
+      <input
+        aria-label={`Args for ${component.componentName}`}
+        onBlur={() => patch({ args })}
+        onChange={(event) => setArgs(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            patch({ args });
+          }
+        }}
+        placeholder="Args (e.g. label:Save)"
+        style={{ ...inputStyle(theme), marginTop: 6 }}
+        value={args}
+      />
+      <textarea
+        aria-label={`Instruction for ${component.componentName}`}
+        onChange={(event) => patch({ note: event.target.value })}
+        placeholder="Describe how to use it"
+        ref={noteRef}
+        rows={2}
+        style={{ ...inputStyle(theme), marginTop: 6, resize: "vertical" }}
+        value={component.note}
       />
     </div>
   );

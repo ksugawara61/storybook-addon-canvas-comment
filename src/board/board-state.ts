@@ -3,6 +3,7 @@ import type {
   BoardFile,
   BoardFrame,
   BoardNote,
+  ComponentPlacement,
   ElementEdit,
 } from "./board-schema.ts";
 import { DEFAULT_FRAME_SIZE, FRAME_GAP } from "./constants.ts";
@@ -13,6 +14,7 @@ const now = (): string => new Date().toISOString();
 const touch = (board: Board): Board => ({ ...board, updatedAt: now() });
 
 export const createBoard = (name: string): Board => ({
+  components: [],
   edits: [],
   frames: [],
   id: createId(),
@@ -73,8 +75,12 @@ export const duplicateFrame = (board: Board, frameId: string): Board => {
   const copiedEdits = board.edits
     .filter((edit) => edit.frameId === frameId)
     .map((edit) => ({ ...edit, frameId: copy.id, id: createId() }));
+  const copiedComponents = board.components
+    .filter((component) => component.frameId === frameId)
+    .map((component) => ({ ...component, frameId: copy.id, id: createId() }));
   return touch({
     ...board,
+    components: [...board.components, ...copiedComponents],
     edits: [...board.edits, ...copiedEdits],
     frames: [...board.frames, copy],
   });
@@ -95,6 +101,9 @@ export const updateFrame = (
 export const removeFrame = (board: Board, frameId: string): Board =>
   touch({
     ...board,
+    components: board.components.filter(
+      (component) => component.frameId !== frameId,
+    ),
     edits: board.edits.filter((edit) => edit.frameId !== frameId),
     frames: board.frames.filter((frame) => frame.id !== frameId),
   });
@@ -181,3 +190,48 @@ export const updateEdit = (
 
 export const removeEdit = (board: Board, editId: string): Board =>
   touch({ ...board, edits: board.edits.filter((edit) => edit.id !== editId) });
+
+export type ComponentInput = Omit<
+  ComponentPlacement,
+  "args" | "createdAt" | "id" | "note"
+>;
+
+/** Returns the placed component too, so the board can select it. */
+export const addComponent = (
+  board: Board,
+  input: ComponentInput,
+): { board: Board; component: ComponentPlacement } => {
+  const component: ComponentPlacement = {
+    ...input,
+    args: "",
+    createdAt: now(),
+    id: createId(),
+    note: "",
+  };
+  return {
+    board: touch({ ...board, components: [...board.components, component] }),
+    component,
+  };
+};
+
+export const updateComponent = (
+  board: Board,
+  componentId: string,
+  patch: Partial<
+    Pick<ComponentPlacement, "args" | "height" | "note" | "width" | "x" | "y">
+  >,
+): Board =>
+  touch({
+    ...board,
+    components: board.components.map((component) =>
+      component.id === componentId ? { ...component, ...patch } : component,
+    ),
+  });
+
+export const removeComponent = (board: Board, componentId: string): Board =>
+  touch({
+    ...board,
+    components: board.components.filter(
+      (component) => component.id !== componentId,
+    ),
+  });

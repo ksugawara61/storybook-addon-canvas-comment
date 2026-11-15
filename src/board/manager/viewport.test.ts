@@ -16,6 +16,7 @@ const createFrame = (overrides?: Partial<BoardFrame>): BoardFrame => ({
 });
 
 const createBoard = (frames: BoardFrame[]): Board => ({
+  components: [],
   edits: [],
   frames,
   id: "board-1",

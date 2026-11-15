@@ -8,6 +8,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "noEmit": true,
+    "paths": { "@example/ui": ["./src/ui/index.ts"] },
     "skipLibCheck": true,
     "strict": true,
     "target": "ES2022",
