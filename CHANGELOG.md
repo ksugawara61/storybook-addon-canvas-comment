@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.3.0
+
 - Add design system components to the board.
   List design systems with the preset option `designSystems`: the stories under a title prefix, or the stories of a composed Storybook (`refs`).
   The board's **Components** panel lists their components, and you drag a story onto a frame to place the component there.
