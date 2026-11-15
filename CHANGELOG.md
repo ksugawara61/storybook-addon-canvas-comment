@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.0
+
 - Add a board page (`/?path=/board/`) for comparing stories side by side.
   Lay stories out as frames, duplicate them, override their args, and resize them to Mobile / Tablet / Desktop.
   In Element mode, click an element in a frame to comment on it, or drag it to leave a move instruction that is previewed in the frame.
