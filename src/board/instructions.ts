@@ -1,4 +1,9 @@
-import type { Board, BoardFrame, BoardNote } from "./board-schema.ts";
+import type {
+  Board,
+  BoardFrame,
+  BoardNote,
+  ComponentPlacement,
+} from "./board-schema.ts";
 
 const formatMove = (dx: number, dy: number): string | undefined => {
   const parts = [
@@ -11,6 +16,22 @@ const formatMove = (dx: number, dy: number): string | undefined => {
 const frameHeading = (frame: BoardFrame): string => {
   const args = frame.args ? ` / args: \`${frame.args}\`` : "";
   return `### ${frame.label}\n\n- story: \`${frame.storyId}\`${args}\n- size: ${frame.width}×${frame.height}`;
+};
+
+const formatComponent = (component: ComponentPlacement): string => {
+  const source = [
+    `story \`${component.storyId}\``,
+    ...(component.args ? [`args \`${component.args}\``] : []),
+  ].join(", ");
+  const anchor = component.anchorLabel
+    ? `, over ${component.anchorLabel}${component.anchorSelector ? ` (\`${component.anchorSelector}\`)` : ""}`
+    : "";
+  const placement = `at x ${component.x}px, y ${component.y}px, ${component.width}×${component.height}${anchor}`;
+  const note = component.note.trim();
+  return [
+    `- Add \`${component.componentName}\` (\`import { ${component.componentName} } from "${component.importPath}"\`, as in ${source}) ${placement}`,
+    ...(note ? [note] : []),
+  ].join(" / ");
 };
 
 const isNoteOnFrame = (note: BoardNote, frame: BoardFrame): boolean =>
@@ -28,13 +49,27 @@ const formatFrame = (board: Board, frame: BoardFrame): string => {
         .join(" / ");
       return `${index + 1}. ${edit.label} (\`${edit.selector}\`): ${details || "(no instruction)"}`;
     });
+  const componentLines = board.components
+    .filter((component) => component.frameId === frame.id)
+    .map(formatComponent);
   const noteLines = board.notes
     .filter((note) => note.body.trim() !== "" && isNoteOnFrame(note, frame))
     .map((note) => `- Note: ${note.body.trim()}`);
-  if (editLines.length === 0 && noteLines.length === 0) {
+  if (
+    editLines.length === 0 &&
+    componentLines.length === 0 &&
+    noteLines.length === 0
+  ) {
     return "";
   }
-  return [frameHeading(frame), "", ...editLines, ...noteLines].join("\n");
+  return [
+    frameHeading(frame),
+    ...(editLines.length > 0 ? ["", ...editLines] : []),
+    ...(componentLines.length > 0
+      ? ["", "Components to add:", "", ...componentLines]
+      : []),
+    ...(noteLines.length > 0 ? ["", ...noteLines] : []),
+  ].join("\n");
 };
 
 const formatBoard = (board: Board): string => {
@@ -70,6 +105,7 @@ export const toInstructionsMarkdown = (boards: Board[]): string =>
     "# Storybook board instructions",
     "",
     "Moves are in rendered CSS px. Apply them as spacing or layout changes in the code.",
+    "Components to add come from a design system. Import them as shown and place them where they were dropped; positions are in the frame's CSS px from its top-left corner.",
     "",
     boards.map(formatBoard).join("\n\n"),
   ].join("\n")}\n`;

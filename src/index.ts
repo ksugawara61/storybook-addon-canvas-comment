@@ -6,7 +6,14 @@ import {
   createBoardPaths,
   handleBoardRequest,
 } from "./board/api.ts";
-import { BOARD_API_PATH } from "./board/constants.ts";
+import {
+  BOARD_API_PATH,
+  DESIGN_SYSTEMS_ENV_KEY,
+} from "./board/constants.ts";
+import {
+  type DesignSystemOption,
+  normalizeDesignSystems,
+} from "./board/design-system.ts";
 import {
   createCanvasCommentReply,
   isCanvasComment,
@@ -41,7 +48,14 @@ export type CanvasCommentsPresetOptions = {
   apiUrl?: string;
   /** Set to `false` to leave out the board page and its "Add to board" toolbar button. */
   board?: boolean;
+  /**
+   * Design systems whose components can be dragged from the board's component library onto frames.
+   * See "Design system components" in the README.
+   */
+  designSystems?: DesignSystemOption[];
 };
+
+export type { DesignSystemOption };
 
 export const managerEntries = (
   entries: string[] = [],
@@ -60,10 +74,17 @@ export const previewAnnotations = (entries: string[] = []) => [
 export const env = (
   existing: Record<string, string> = {},
   options: CanvasCommentsPresetOptions = {},
-): Record<string, string> => ({
-  ...existing,
-  ...(options.apiUrl ? { CANVAS_COMMENTS_API_URL: options.apiUrl } : {}),
-});
+): Record<string, string> => {
+  const designSystems = normalizeDesignSystems(options.designSystems);
+  return {
+    ...existing,
+    ...(options.apiUrl ? { CANVAS_COMMENTS_API_URL: options.apiUrl } : {}),
+    // The manager build replaces process.env.* with these values, so pass the list as JSON.
+    ...(designSystems.length > 0
+      ? { [DESIGN_SYSTEMS_ENV_KEY]: JSON.stringify(designSystems) }
+      : {}),
+  };
+};
 
 const json = (res: ServerResponse, statusCode: number, value: unknown) => {
   res.statusCode = statusCode;

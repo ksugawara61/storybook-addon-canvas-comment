@@ -39,7 +39,7 @@ The [Board](#board) section has a demo of the board page.
 | Replies | Each comment has a reply thread. Reviewers reply from the panel. Coding agents reply with the `reply` CLI to explain what they changed. The thread is shown in the panel and in the pin tooltip. |
 | Review-completion signal | A "Complete review" button in the panel flips a review status flag. A waiting coding agent can detect it. "Reopen review" flips it back. |
 | Agent-friendly output | The `dom-map` and `wait-comments` CLIs pair each comment with its saved DOM snapshot. They emit JSON built for LLM consumption. |
-| Board | A board page (`/?path=/board/`) lays stories out as frames to compare variants. Drag elements in a frame to leave move instructions, comment on them, and put notes on the board. The instructions are written as Markdown for coding agents. See [Board](#board). |
+| Board | A board page (`/?path=/board/`) lays stories out as frames to compare variants. Drag elements in a frame to leave move instructions, comment on them, and put notes on the board. Drag components from a design system onto a frame to show what to add. The instructions are written as Markdown for coding agents. See [Board](#board). |
 
 ## Requirements
 
@@ -189,6 +189,68 @@ Hold `Alt` to pick one level further out.
 Each instruction gets a numbered pin, and moves are previewed inside the frame with a CSS `translate`.
 The story code does not change; a coding agent or a person makes the real fix.
 
+### Design system components
+
+The board can list the components of a design system, such as a `@acme/ui` package in your monorepo.
+Drag one onto a frame to show where it should go.
+The board renders the component's story in place, and writes an instruction to add it, with its import, to the Markdown for coding agents.
+
+![Dragging an Alert and a Checkbox from the Components panel onto the sign-up form, giving them args and notes, and the Markdown handed to a coding agent](docs/images/board-components.gif)
+
+The demo searches the **Components** panel of the example design system and drags an Alert above the sign-up form.
+It drops a Checkbox on the form, gives it args and a note, and moves the Alert.
+It then shows the Markdown the board writes for a coding agent.
+
+List the design systems in the preset options.
+Each one is a set of stories: the stories under a title prefix in this Storybook, or the stories of a [composed Storybook](https://storybook.js.org/docs/sharing/storybook-composition).
+
+```ts
+// .storybook/main.ts
+const config: StorybookConfig = {
+  addons: [
+    {
+      name: "storybook-addon-canvas-comments",
+      options: {
+        designSystems: [
+          // Stories in this Storybook whose title starts with "UI/"
+          { name: "Example UI", importPath: "@example/ui", titlePrefix: "UI/" },
+          // Every story of the Storybook composed as `refs.ui`
+          { name: "@acme/ui", ref: "ui" },
+        ],
+      },
+    },
+  ],
+  refs: {
+    ui: { title: "@acme/ui", url: "http://localhost:6008" },
+  },
+};
+```
+
+| Option | Description |
+| --- | --- |
+| `name` | Shown in the **Components** panel. |
+| `importPath` | The module written into the instructions, as in `import { Alert } from "@example/ui"`. Defaults to `name`. |
+| `titlePrefix` | Only stories whose title starts with this. Leave it out to list every story. |
+| `ref` | The id of a composed Storybook in `refs`. Leave it out for stories in this Storybook. |
+
+With a design system set, the board toolbar has a **Components** button that shows or hides the panel.
+The panel groups the stories by component, and each story is a variant you can drag:
+
+- Drag a story onto a frame. The frame is highlighted while the pointer is over it.
+  The component goes where you drop it, and takes the height of its rendered story.
+- Click a story, or focus it and press `Enter`, to add it to the top-left of the selected frame (or of the first frame).
+- Drag a placed component to move it, and drag its bottom-right corner to resize it.
+- In the side panel, give it args in Storybook's URL format, such as `title:Saved`, and describe how to use it.
+
+The component name comes from the last part of the story title.
+`UI/Alert` gives `Alert`, and an auto title such as `buttons/primary-button` gives `PrimaryButton`.
+When the component is dropped on an element of the story, the board records that element too, like an element instruction.
+
+Stories of a composed Storybook render from its URL.
+When that URL is on another origin, the board cannot read the rendered story.
+So the component keeps the default 320×64 box and Storybook's own padding; resize it by hand.
+The composed Storybook also has to allow the manager's origin with CORS, as for any composed Storybook.
+
 ### Board instructions for coding agents
 
 With the dev server, the board saves two files under the directory where Storybook runs:
@@ -201,7 +263,7 @@ With the dev server, the board saves two files under the directory where Storybo
 `board-instructions.md` is rewritten on every save, so an agent can read it as-is.
 **Copy as Markdown** in the side panel copies the same Markdown for the current board.
 Each element is identified by its role and accessible name, and by a CSS selector.
-Moves are in the story's rendered CSS px:
+Moves, and the positions of components to add, are in the story's rendered CSS px:
 
 ```markdown
 ## Board 1
@@ -213,6 +275,10 @@ Moves are in the story's rendered CSS px:
 
 1. button "Sign up" (`#storybook-root > form > div:nth-of-type(3) > button:nth-of-type(2)`): move left 131px, move down 94px / Put Sign up on its own row, full width
 2. heading "Create your account" (`#storybook-root > form > h2`): Use the title from Short Title
+
+Components to add:
+
+- Add `Checkbox` (`import { Checkbox } from "@example/ui"`, as in story `ui-checkbox--unchecked`, args `label:I agree to the Terms`) at x 41px, y 445px, 320×17, over form "Sign up" (`#storybook-root > form`) / Required before Sign up
 
 ### Board notes
 

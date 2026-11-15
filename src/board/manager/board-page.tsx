@@ -6,17 +6,30 @@
 import React from "react";
 import {
   type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
   useRef,
   useState,
 } from "react";
 import { useTheme } from "storybook/theming";
+import type { Board, BoardFrame } from "../board-schema.ts";
+import { addComponent } from "../board-state.ts";
 import {
   BOARD_FILE_RELATIVE_PATH,
+  COMPONENT_ACCENT,
+  DEFAULT_COMPONENT_SIZE,
   INSTRUCTIONS_FILE_RELATIVE_PATH,
+  LIBRARY_OPEN_STORAGE_KEY,
 } from "../constants.ts";
 import { BoardCanvas } from "./board-canvas.tsx";
+import { requestAutoSize } from "./board-component.tsx";
+import {
+  ComponentLibrary,
+  DESIGN_SYSTEMS,
+  type LibraryItem,
+} from "./component-library.tsx";
+import { findDropAnchor, getFrameDocument } from "./frame-documents.ts";
 import { SidePanel } from "./side-panel.tsx";
 import {
   addBoard,
@@ -37,6 +50,43 @@ const MODES: { key: string; label: string; mode: BoardMode }[] = [
   { key: "N", label: "Note", mode: "note" },
 ];
 
+const DRAG_THRESHOLD_PX = 3;
+// Where a component goes when it is added without a drag (a click or the keyboard).
+const DEFAULT_COMPONENT_OFFSET = 16;
+
+const readLibraryOpen = (): boolean => {
+  try {
+    return globalThis.localStorage.getItem(LIBRARY_OPEN_STORAGE_KEY) !== "false";
+  } catch {
+    return true;
+  }
+};
+
+/** The topmost frame under a point in board coordinates, and the point in that frame's CSS px. */
+const hitFrame = (
+  board: Board | undefined,
+  point: { x: number; y: number },
+): { frame: BoardFrame; x: number; y: number } | undefined => {
+  const frame = [...(board?.frames ?? [])]
+    .reverse()
+    .find(
+      (item) =>
+        point.x >= item.x &&
+        point.x <= item.x + item.width &&
+        point.y >= item.y &&
+        point.y <= item.y + item.height,
+    );
+  return frame
+    ? { frame, x: point.x - frame.x, y: point.y - frame.y }
+    : undefined;
+};
+
+type ComponentDrag = {
+  client: { x: number; y: number };
+  frameId: string | undefined;
+  item: LibraryItem;
+};
+
 const STORAGE_LABELS = {
   file: `Saved to ${BOARD_FILE_RELATIVE_PATH} (and ${INSTRUCTIONS_FILE_RELATIVE_PATH})`,
   loading: "Loading…",
@@ -50,8 +100,134 @@ export const BoardPage = () => {
   const [mode, setMode] = useState<BoardMode>("select");
   const [viewport, setViewport] = useState<Viewport>({ x: 64, y: 96, zoom: 1 });
   const [selectedFrameId, setSelectedFrameId] = useState<string>();
-  const [selectedEditId, setSelectedEditId] = useState<string>();
+  const [selectedItemId, setSelectedItemId] = useState<string>();
+  const [libraryOpen, setLibraryOpen] = useState(readLibraryOpen);
+  const [componentDrag, setComponentDrag] = useState<ComponentDrag>();
   const canvasRef = useRef<HTMLDivElement>(null);
+  const hasLibrary = DESIGN_SYSTEMS.length > 0;
+
+  // Drag handlers outlive the render that started them, so they read the latest values here.
+  const latest = useRef({ board, selectedFrameId, viewport });
+  latest.current = { board, selectedFrameId, viewport };
+
+  const toBoardPoint = (client: { x: number; y: number }) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    const current = latest.current.viewport;
+    if (
+      !rect ||
+      client.x < rect.left ||
+      client.x > rect.right ||
+      client.y < rect.top ||
+      client.y > rect.bottom
+    ) {
+      return undefined;
+    }
+    return {
+      x: (client.x - rect.left - current.x) / current.zoom,
+      y: (client.y - rect.top - current.y) / current.zoom,
+    };
+  };
+
+  const placeComponent = (
+    item: LibraryItem,
+    frame: BoardFrame,
+    point: { x: number; y: number },
+  ) => {
+    const doc = getFrameDocument(frame.id);
+    const anchor = doc ? findDropAnchor(doc, point) : undefined;
+    const width = Math.min(DEFAULT_COMPONENT_SIZE.width, frame.width);
+    const { height } = DEFAULT_COMPONENT_SIZE;
+    let componentId = "";
+    updateActiveBoard((current) => {
+      const result = addComponent(current, {
+        anchorLabel: anchor?.label ?? "",
+        anchorSelector: anchor?.selector ?? "",
+        componentName: item.component.componentName,
+        designSystem: item.component.designSystem,
+        frameId: frame.id,
+        height,
+        importPath: item.component.importPath,
+        refId: item.component.refId ?? "",
+        storyId: item.story.storyId,
+        storyName: item.story.name,
+        width,
+        // Keep the box inside the frame where it can.
+        x: Math.round(Math.max(0, Math.min(point.x, frame.width - width))),
+        y: Math.round(Math.max(0, Math.min(point.y, frame.height - height))),
+      });
+      componentId = result.component.id;
+      return result.board;
+    });
+    requestAutoSize(componentId);
+    setSelectedFrameId(frame.id);
+    setSelectedItemId(componentId);
+  };
+
+  const addToSelectedFrame = (item: LibraryItem) => {
+    const { board: current, selectedFrameId: frameId } = latest.current;
+    const frame =
+      current?.frames.find((candidate) => candidate.id === frameId) ??
+      current?.frames[0];
+    if (frame) {
+      placeComponent(item, frame, {
+        x: DEFAULT_COMPONENT_OFFSET,
+        y: DEFAULT_COMPONENT_OFFSET,
+      });
+    }
+  };
+
+  const pickUpComponent = (
+    item: LibraryItem,
+    event: ReactPointerEvent<HTMLElement>,
+  ) => {
+    if (event.button !== 0) {
+      return;
+    }
+    event.preventDefault();
+    // Capturing the pointer keeps the frames' iframes from swallowing the drag.
+    const element = event.currentTarget;
+    const { pointerId } = event;
+    element.setPointerCapture(pointerId);
+    const start = { x: event.clientX, y: event.clientY };
+    let moved = false;
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const client = { x: moveEvent.clientX, y: moveEvent.clientY };
+      moved ||=
+        Math.hypot(client.x - start.x, client.y - start.y) > DRAG_THRESHOLD_PX;
+      if (moved) {
+        const point = toBoardPoint(client);
+        const hit = point ? hitFrame(latest.current.board, point) : undefined;
+        setComponentDrag({ client, frameId: hit?.frame.id, item });
+      }
+    };
+    const onPointerUp = (upEvent: PointerEvent) => {
+      element.releasePointerCapture(pointerId);
+      element.removeEventListener("pointermove", onPointerMove);
+      element.removeEventListener("pointerup", onPointerUp);
+      element.removeEventListener("pointercancel", onPointerCancel);
+      setComponentDrag(undefined);
+      if (!moved) {
+        addToSelectedFrame(item);
+        return;
+      }
+      const point = toBoardPoint({ x: upEvent.clientX, y: upEvent.clientY });
+      const hit = point ? hitFrame(latest.current.board, point) : undefined;
+      if (hit) {
+        placeComponent(item, hit.frame, hit);
+      }
+    };
+    const onPointerCancel = () => {
+      element.releasePointerCapture(pointerId);
+      element.removeEventListener("pointermove", onPointerMove);
+      element.removeEventListener("pointerup", onPointerUp);
+      element.removeEventListener("pointercancel", onPointerCancel);
+      setComponentDrag(undefined);
+    };
+    element.addEventListener("pointermove", onPointerMove);
+    element.addEventListener("pointerup", onPointerUp);
+    element.addEventListener("pointercancel", onPointerCancel);
+  };
 
   const updateViewport = useCallback(
     (update: (current: Viewport) => Viewport) => setViewport(update),
@@ -235,33 +411,87 @@ export const BoardPage = () => {
         </button>
         <Divider color={theme.appBorderColor} />
         <StoryPicker />
+        {hasLibrary ? (
+          <button
+            aria-pressed={libraryOpen}
+            onClick={() => {
+              const next = !libraryOpen;
+              setLibraryOpen(next);
+              try {
+                globalThis.localStorage.setItem(
+                  LIBRARY_OPEN_STORAGE_KEY,
+                  String(next),
+                );
+              } catch {
+                // The panel state is only a convenience.
+              }
+            }}
+            style={barButton(libraryOpen)}
+            title="Show the design system components"
+            type="button"
+          >
+            Components
+          </button>
+        ) : null}
       </div>
       <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+        {hasLibrary && libraryOpen ? (
+          <ComponentLibrary
+            onAdd={addToSelectedFrame}
+            onPickUp={pickUpComponent}
+          />
+        ) : null}
         <div ref={canvasRef} style={{ display: "flex", flex: 1, minWidth: 0 }}>
           <BoardCanvas
             board={board}
+            dropFrameId={componentDrag?.frameId}
             mode={mode}
             onModeChange={setMode}
-            onSelectEdit={setSelectedEditId}
             onSelectFrame={setSelectedFrameId}
+            onSelectItem={setSelectedItemId}
             onViewportChange={updateViewport}
-            selectedEditId={selectedEditId}
             selectedFrameId={selectedFrameId}
+            selectedItemId={selectedItemId}
             viewport={viewport}
           />
         </div>
         <SidePanel
           board={board}
-          onSelectEdit={setSelectedEditId}
           onSelectFrame={setSelectedFrameId}
-          selectedEditId={selectedEditId}
+          onSelectItem={setSelectedItemId}
           selectedFrameId={selectedFrameId}
+          selectedItemId={selectedItemId}
           storageLabel={STORAGE_LABELS[store.status]}
         />
       </div>
+      {componentDrag ? <DragGhost drag={componentDrag} /> : null}
     </div>
   );
 };
+
+/** Follows the pointer while a library component is dragged. */
+const DragGhost = ({ drag }: { drag: ComponentDrag }) => (
+  <div
+    style={{
+      background: COMPONENT_ACCENT,
+      borderRadius: 4,
+      boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+      color: "#fff",
+      fontSize: 12,
+      left: drag.client.x + 12,
+      opacity: drag.frameId ? 1 : 0.7,
+      padding: "4px 8px",
+      pointerEvents: "none",
+      position: "fixed",
+      top: drag.client.y + 12,
+      whiteSpace: "nowrap",
+      zIndex: 1000,
+    }}
+  >
+    {`<${drag.item.component.componentName}> ${drag.item.story.name}`}
+    {drag.frameId ? null : " — drop on a frame"}
+  </div>
+);
 
 const Divider = ({ color }: { color: string }) => (
   <span style={{ alignSelf: "stretch", borderLeft: `1px solid ${color}` }} />

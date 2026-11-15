@@ -24,6 +24,19 @@ const edit = (frameId: string) => ({
   selector: "#root > button",
 });
 
+const component = (frameId: string) => ({
+  componentName: "Alert",
+  designSystem: "Example UI",
+  frameId,
+  height: 64,
+  id: `component-${frameId}`,
+  importPath: "@example/ui",
+  storyId: "ui-alert--warning",
+  width: 320,
+  x: 16,
+  y: 120,
+});
+
 describe("parseBoardFile", () => {
   it.each([
     ["null", null],
@@ -51,5 +64,47 @@ describe("parseBoardFile", () => {
       edits: [{ frameId: "frame-1" }],
       frames: [{ id: "frame-1" }],
     });
+  });
+
+  it("loads a board saved before components existed", () => {
+    const parsed = parseBoardFile({
+      boards: [{ edits: [], frames: [frame], id: "board-1", name: "Old", notes: [] }],
+      version: 1,
+    });
+
+    expect(parsed.boards[0]?.components).toEqual([]);
+  });
+
+  it("fills the optional component fields and drops components for missing frames", () => {
+    const parsed = parseBoardFile({
+      boards: [
+        {
+          components: [
+            component("frame-1"),
+            component("frame-removed"),
+            { ...component("frame-1"), id: "broken", x: "16" },
+          ],
+          edits: [],
+          frames: [frame],
+          id: "board-1",
+          name: "Compare",
+          notes: [],
+        },
+      ],
+      version: 1,
+    });
+
+    expect(parsed.boards[0]?.components).toEqual([
+      {
+        ...component("frame-1"),
+        anchorLabel: "",
+        anchorSelector: "",
+        args: "",
+        createdAt: "",
+        note: "",
+        refId: "",
+        storyName: "",
+      },
+    ]);
   });
 });

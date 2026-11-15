@@ -31,7 +31,35 @@ export type ElementEdit = {
   selector: string;
 };
 
+/**
+ * A design-system component placed on a frame, to be added to the story's code.
+ * Position and size are in the frame's CSS px, from its top-left corner.
+ */
+export type ComponentPlacement = {
+  /** The element the component was dropped on, so an agent knows where it goes. Empty when none. */
+  anchorLabel: string;
+  anchorSelector: string;
+  /** Args to render the component's story with, in Storybook's URL format. */
+  args: string;
+  componentName: string;
+  createdAt: string;
+  designSystem: string;
+  frameId: string;
+  height: number;
+  id: string;
+  importPath: string;
+  note: string;
+  /** Id of the composed Storybook the story comes from. Empty for this Storybook. */
+  refId: string;
+  storyId: string;
+  storyName: string;
+  width: number;
+  x: number;
+  y: number;
+};
+
 export type Board = {
+  components: ComponentPlacement[];
   edits: ElementEdit[];
   frames: BoardFrame[];
   id: string;
@@ -84,6 +112,53 @@ const isElementEdit = (value: unknown): value is ElementEdit =>
   isNumber(value.dx) &&
   isNumber(value.dy);
 
+const COMPONENT_STRING_FIELDS = [
+  "componentName",
+  "designSystem",
+  "frameId",
+  "id",
+  "importPath",
+  "storyId",
+] as const;
+
+const COMPONENT_NUMBER_FIELDS = ["height", "width", "x", "y"] as const;
+
+// Fields added later or left empty default to "", so older or hand-written files still load.
+const parseComponentPlacement = (
+  value: unknown,
+): ComponentPlacement | undefined => {
+  if (
+    !isRecord(value) ||
+    !COMPONENT_STRING_FIELDS.every((key) => isString(value[key])) ||
+    !COMPONENT_NUMBER_FIELDS.every((key) => isNumber(value[key]))
+  ) {
+    return undefined;
+  }
+  const text = (key: string): string => {
+    const field = value[key];
+    return isString(field) ? field : "";
+  };
+  return {
+    anchorLabel: text("anchorLabel"),
+    anchorSelector: text("anchorSelector"),
+    args: text("args"),
+    componentName: text("componentName"),
+    createdAt: text("createdAt"),
+    designSystem: text("designSystem"),
+    frameId: text("frameId"),
+    height: value.height as number,
+    id: text("id"),
+    importPath: text("importPath"),
+    note: text("note"),
+    refId: text("refId"),
+    storyId: text("storyId"),
+    storyName: text("storyName"),
+    width: value.width as number,
+    x: value.x as number,
+    y: value.y as number,
+  };
+};
+
 const filterArray = <T>(
   value: unknown,
   guard: (item: unknown) => item is T,
@@ -96,6 +171,12 @@ const parseBoard = (value: unknown): Board | undefined => {
   const frames = filterArray(value.frames, isBoardFrame);
   const frameIds = new Set(frames.map((frame) => frame.id));
   return {
+    components: (Array.isArray(value.components) ? value.components : [])
+      .map(parseComponentPlacement)
+      .filter(
+        (component): component is ComponentPlacement =>
+          component !== undefined && frameIds.has(component.frameId),
+      ),
     // Instructions for a removed frame can be neither shown nor applied, so drop them on load.
     edits: filterArray(value.edits, isElementEdit).filter((edit) =>
       frameIds.has(edit.frameId),
