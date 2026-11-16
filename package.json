@@ -6,7 +6,7 @@
     "canvas-comments-wait-comments": "./dist/cli/wait-comments.js"
   },
   "bugs": {
-    "url": "https://github.com/ksugawara61/storybook-addon-canvas-comment/issues"
+    "url": "https://github.com/ksugawara61/storybook-addon-canvas-comments/issues"
   },
   "dependencies": {
     "dom-accessibility-api": "^0.6.3"
@@ -53,7 +53,7 @@
     "src/types.ts",
     "!src/**/*.test.ts"
   ],
-  "homepage": "https://github.com/ksugawara61/storybook-addon-canvas-comment#readme",
+  "homepage": "https://github.com/ksugawara61/storybook-addon-canvas-comments#readme",
   "keywords": [
     "storybook-addon",
     "canvas",
@@ -74,7 +74,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ksugawara61/storybook-addon-canvas-comment.git"
+    "url": "git+https://github.com/ksugawara61/storybook-addon-canvas-comments.git"
   },
   "scripts": {
     "build": "tsup",
