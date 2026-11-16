@@ -18,10 +18,13 @@ const STYLE_ID = "canvas-comments-board-component-style";
 const AUTO_SIZE_TIMEOUT_MS = 3000;
 
 // Fit the story to the box: no Storybook padding or centering, a transparent background, no scrollbars.
+// The root takes the height of its content, so a preview that stretches it to the viewport
+// (such as `#storybook-root { height: 100% }` for full-screen React Native Web stories) can still be measured.
 const PREVIEW_CSS = `
 html, body { background: transparent !important; overflow: hidden !important; }
 body.sb-show-main { display: block !important; margin: 0 !important; min-height: 0 !important; padding: 0 !important; }
 body.sb-show-main #storybook-root { margin: 0 !important; padding: 0 !important; }
+html, body, body.sb-show-main #storybook-root { height: auto !important; min-height: 0 !important; }
 `;
 
 // Components placed in this session take the height of their rendered story once it loads.
