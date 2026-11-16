@@ -7,11 +7,13 @@ import React from "react";
 import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useRef,
   useState,
 } from "react";
+import { useStorybookApi } from "storybook/manager-api";
 import { useTheme } from "storybook/theming";
 import type { Board, BoardFrame } from "../board-schema.ts";
 import { listInstructionItems } from "../board-items.ts";
@@ -44,6 +46,11 @@ import {
 } from "./store.ts";
 import { StoryPicker } from "./story-picker.tsx";
 import type { BoardMode, Viewport } from "./types.ts";
+import {
+  COMPACT_MEDIA_QUERY,
+  MOBILE_MEDIA_QUERY,
+  useMediaQuery,
+} from "./use-media-query.ts";
 import { clampZoom, fitViewport } from "./viewport.ts";
 
 const MODES: { key: string; label: string; mode: BoardMode }[] = [
@@ -56,6 +63,34 @@ const MODES: { key: string; label: string; mode: BoardMode }[] = [
 const DRAG_THRESHOLD_PX = 3;
 // Where a component goes when it is added without a drag (a click or the keyboard).
 const DEFAULT_COMPONENT_OFFSET = 16;
+
+/** On a phone, the panels slide over the canvas from the bottom, one at a time. */
+type Sheet = "details" | "library";
+
+// The board UI is styled inline; these rules need media queries.
+// Inputs below 16px make iOS Safari zoom the page when they are focused.
+// The notes on the canvas (role="application") scale with the board, so they keep their size.
+const RESPONSIVE_CSS = `
+@media ${MOBILE_MEDIA_QUERY} {
+  /* Storybook's page container on a phone is as tall as its content, so 100% would collapse the canvas. */
+  [data-board-page] {
+    height: 100vh !important;
+    height: 100dvh !important;
+  }
+}
+@media ${COMPACT_MEDIA_QUERY} {
+  [data-board-page] :is(input, select, textarea):not([role="application"] *) {
+    font-size: 16px !important;
+  }
+}
+@media (pointer: coarse) {
+  [data-board-page] :is(button, select):not([role="application"] *) {
+    min-height: 32px;
+  }
+}
+[data-board-scroll] { scrollbar-width: none; }
+[data-board-scroll]::-webkit-scrollbar { display: none; }
+`;
 
 const readLibraryOpen = (): boolean => {
   try {
@@ -106,6 +141,7 @@ const storageLabel = (status: "file" | "loading" | "local"): string =>
 
 export const BoardPage = () => {
   const theme = useTheme();
+  const api = useStorybookApi();
   const store = useBoardStore();
   const board = selectActiveBoard(store);
   const [mode, setMode] = useState<BoardMode>("select");
@@ -115,7 +151,21 @@ export const BoardPage = () => {
   const [libraryOpen, setLibraryOpen] = useState(readLibraryOpen);
   const [componentDrag, setComponentDrag] = useState<ComponentDrag>();
   const canvasRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
   const hasLibrary = DESIGN_SYSTEMS.length > 0;
+  const compact = useMediaQuery(COMPACT_MEDIA_QUERY);
+  const mobile = useMediaQuery(MOBILE_MEDIA_QUERY);
+  const [sheet, setSheet] = useState<Sheet>();
+  const toggleSheet = (next: Sheet) =>
+    setSheet((current) => (current === next ? undefined : next));
+
+  // Selecting an instruction or a component opens the details sheet so its note can be written,
+  // unless the user is still picking components from the library.
+  useEffect(() => {
+    if (compact && selectedItemId) {
+      setSheet((current) => (current === "library" ? current : "details"));
+    }
+  }, [compact, selectedItemId]);
 
   // Drag handlers outlive the render that started them, so they read the latest values here.
   const latest = useRef({ board, selectedFrameId, viewport });
@@ -124,13 +174,12 @@ export const BoardPage = () => {
   const toBoardPoint = (client: { x: number; y: number }) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     const current = latest.current.viewport;
-    if (
-      !rect ||
-      client.x < rect.left ||
-      client.x > rect.right ||
-      client.y < rect.top ||
-      client.y > rect.bottom
-    ) {
+    if (!rect || !contains(rect, client)) {
+      return undefined;
+    }
+    // A sheet covers the bottom of the canvas on a phone; dropping there would land on a hidden frame.
+    const sheetRect = sheetRef.current?.getBoundingClientRect();
+    if (sheetRect && contains(sheetRect, client)) {
       return undefined;
     }
     return {
@@ -309,8 +358,238 @@ export const BoardPage = () => {
     padding: "4px 8px",
   });
 
+  const boardControls = (
+    <>
+      <select
+        aria-label="Board"
+        onChange={(event) => setActiveBoard(event.target.value)}
+        style={barButton()}
+        value={board?.id ?? ""}
+      >
+        {store.file.boards.length === 0 ? (
+          <option value="">Board 1</option>
+        ) : null}
+        {store.file.boards.map((item) => (
+          <option key={item.id} value={item.id}>
+            {item.name}
+          </option>
+        ))}
+      </select>
+      <button
+        onClick={() => addBoard(`Board ${store.file.boards.length + 1}`)}
+        style={barButton()}
+        type="button"
+      >
+        New
+      </button>
+      <button
+        disabled={!board}
+        onClick={() => {
+          const name = globalThis.prompt("Board name", board?.name);
+          if (name) {
+            updateActiveBoard((current) => ({ ...current, name }));
+          }
+        }}
+        style={barButton()}
+        type="button"
+      >
+        Rename
+      </button>
+      <button
+        disabled={!board}
+        onClick={() => {
+          if (globalThis.confirm(`Delete "${board?.name}"?`)) {
+            deleteActiveBoard();
+          }
+        }}
+        style={barButton()}
+        type="button"
+      >
+        Delete
+      </button>
+    </>
+  );
+
+  const modeButtons = (
+    <div style={{ display: "flex", gap: 4 }}>
+      {MODES.map((item) => (
+        <button
+          aria-pressed={mode === item.mode}
+          key={item.mode}
+          onClick={() => setMode(item.mode)}
+          style={barButton(mode === item.mode)}
+          title={`${item.label} (${item.key})`}
+          type="button"
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  const zoomControls = (
+    <>
+      <button
+        aria-label="Zoom out"
+        onClick={() => zoomBy(1 / 1.25)}
+        style={barButton()}
+        type="button"
+      >
+        -
+      </button>
+      <output
+        aria-label="Zoom level"
+        style={{ minWidth: 40, textAlign: "center" }}
+      >
+        {Math.round(viewport.zoom * 100)}%
+      </output>
+      <button
+        aria-label="Zoom in"
+        onClick={() => zoomBy(1.25)}
+        style={barButton()}
+        type="button"
+      >
+        +
+      </button>
+      <button onClick={fit} style={barButton()} type="button">
+        Fit
+      </button>
+    </>
+  );
+
+  const libraryToggle = hasLibrary ? (
+    <button
+      aria-pressed={compact ? sheet === "library" : libraryOpen}
+      onClick={() => {
+        if (compact) {
+          toggleSheet("library");
+          return;
+        }
+        const next = !libraryOpen;
+        setLibraryOpen(next);
+        try {
+          globalThis.localStorage.setItem(
+            LIBRARY_OPEN_STORAGE_KEY,
+            String(next),
+          );
+        } catch {
+          // The panel state is only a convenience.
+        }
+      }}
+      style={barButton(compact ? sheet === "library" : libraryOpen)}
+      title="Show the design system components"
+      type="button"
+    >
+      Components
+    </button>
+  ) : null;
+
+  const toolbarStyle: CSSProperties = {
+    background: theme.background.content,
+    borderBottom: `1px solid ${theme.appBorderColor}`,
+    color: theme.color.defaultText,
+    display: "flex",
+    gap: compact ? 6 : 8,
+    padding: compact ? "6px 8px" : "6px 12px",
+  };
+
+  const toolbar = compact ? (
+    <div
+      role="toolbar"
+      style={{ ...toolbarStyle, flexDirection: "column" }}
+    >
+      {/* One row that scrolls sideways, so the controls do not push the canvas off a phone screen. */}
+      <div
+        data-board-scroll=""
+        style={{
+          alignItems: "center",
+          display: "flex",
+          gap: 6,
+          margin: "0 -8px",
+          overflowX: "auto",
+          padding: "0 8px",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {mobile ? (
+          // Storybook shows no sidebar on a phone while a page is open.
+          <button
+            onClick={() => api.closeSettings()}
+            style={barButton()}
+            title="Back to the stories"
+            type="button"
+          >
+            ← Stories
+          </button>
+        ) : null}
+        {modeButtons}
+        <Divider color={theme.appBorderColor} />
+        {zoomControls}
+        <Divider color={theme.appBorderColor} />
+        {boardControls}
+      </div>
+      <div style={{ alignItems: "center", display: "flex", gap: 6 }}>
+        <StoryPicker fill />
+        {libraryToggle}
+        <button
+          aria-pressed={sheet === "details"}
+          onClick={() => toggleSheet("details")}
+          style={barButton(sheet === "details")}
+          title="Show the frame and its instructions"
+          type="button"
+        >
+          Details
+        </button>
+      </div>
+    </div>
+  ) : (
+    <div
+      role="toolbar"
+      style={{ ...toolbarStyle, alignItems: "center", flexWrap: "wrap" }}
+    >
+      {boardControls}
+      <Divider color={theme.appBorderColor} />
+      {modeButtons}
+      <Divider color={theme.appBorderColor} />
+      {zoomControls}
+      <Divider color={theme.appBorderColor} />
+      <StoryPicker />
+      {libraryToggle}
+    </div>
+  );
+
+  const library = (style?: CSSProperties) => (
+    <ComponentLibrary
+      onAdd={addToSelectedFrame}
+      onPickUp={pickUpComponent}
+      style={style}
+    />
+  );
+
+  const sidePanel = (style?: CSSProperties) => (
+    <SidePanel
+      board={board}
+      instructionCount={listInstructionItems(store.file.boards).length}
+      onSelectFrame={setSelectedFrameId}
+      onSelectItem={setSelectedItemId}
+      review={store.status === "file" ? store.review : undefined}
+      selectedFrameId={selectedFrameId}
+      selectedItemId={selectedItemId}
+      storageLabel={storageLabel(store.status)}
+      style={style}
+    />
+  );
+
+  const sheetContent: CSSProperties = {
+    border: 0,
+    flex: 1,
+    minHeight: 0,
+    width: "100%",
+  };
+
   return (
     <div
+      data-board-page=""
       style={{
         background: theme.background.app,
         display: "flex",
@@ -319,139 +598,12 @@ export const BoardPage = () => {
         width: "100%",
       }}
     >
+      <style>{RESPONSIVE_CSS}</style>
+      {toolbar}
       <div
-        role="toolbar"
-        style={{
-          alignItems: "center",
-          background: theme.background.content,
-          borderBottom: `1px solid ${theme.appBorderColor}`,
-          color: theme.color.defaultText,
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 8,
-          padding: "6px 12px",
-        }}
+        style={{ display: "flex", flex: 1, minHeight: 0, position: "relative" }}
       >
-        <select
-          aria-label="Board"
-          onChange={(event) => setActiveBoard(event.target.value)}
-          style={barButton()}
-          value={board?.id ?? ""}
-        >
-          {store.file.boards.length === 0 ? (
-            <option value="">Board 1</option>
-          ) : null}
-          {store.file.boards.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
-        </select>
-        <button
-          onClick={() => addBoard(`Board ${store.file.boards.length + 1}`)}
-          style={barButton()}
-          type="button"
-        >
-          New
-        </button>
-        <button
-          disabled={!board}
-          onClick={() => {
-            const name = globalThis.prompt("Board name", board?.name);
-            if (name) {
-              updateActiveBoard((current) => ({ ...current, name }));
-            }
-          }}
-          style={barButton()}
-          type="button"
-        >
-          Rename
-        </button>
-        <button
-          disabled={!board}
-          onClick={() => {
-            if (globalThis.confirm(`Delete "${board?.name}"?`)) {
-              deleteActiveBoard();
-            }
-          }}
-          style={barButton()}
-          type="button"
-        >
-          Delete
-        </button>
-        <Divider color={theme.appBorderColor} />
-        <div style={{ display: "flex", gap: 4 }}>
-          {MODES.map((item) => (
-            <button
-              aria-pressed={mode === item.mode}
-              key={item.mode}
-              onClick={() => setMode(item.mode)}
-              style={barButton(mode === item.mode)}
-              title={`${item.label} (${item.key})`}
-              type="button"
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-        <Divider color={theme.appBorderColor} />
-        <button
-          aria-label="Zoom out"
-          onClick={() => zoomBy(1 / 1.25)}
-          style={barButton()}
-          type="button"
-        >
-          -
-        </button>
-        <output
-          aria-label="Zoom level"
-          style={{ minWidth: 40, textAlign: "center" }}
-        >
-          {Math.round(viewport.zoom * 100)}%
-        </output>
-        <button
-          aria-label="Zoom in"
-          onClick={() => zoomBy(1.25)}
-          style={barButton()}
-          type="button"
-        >
-          +
-        </button>
-        <button onClick={fit} style={barButton()} type="button">
-          Fit
-        </button>
-        <Divider color={theme.appBorderColor} />
-        <StoryPicker />
-        {hasLibrary ? (
-          <button
-            aria-pressed={libraryOpen}
-            onClick={() => {
-              const next = !libraryOpen;
-              setLibraryOpen(next);
-              try {
-                globalThis.localStorage.setItem(
-                  LIBRARY_OPEN_STORAGE_KEY,
-                  String(next),
-                );
-              } catch {
-                // The panel state is only a convenience.
-              }
-            }}
-            style={barButton(libraryOpen)}
-            title="Show the design system components"
-            type="button"
-          >
-            Components
-          </button>
-        ) : null}
-      </div>
-      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-        {hasLibrary && libraryOpen ? (
-          <ComponentLibrary
-            onAdd={addToSelectedFrame}
-            onPickUp={pickUpComponent}
-          />
-        ) : null}
+        {!compact && hasLibrary && libraryOpen ? library() : null}
         <div ref={canvasRef} style={{ display: "flex", flex: 1, minWidth: 0 }}>
           <BoardCanvas
             board={board}
@@ -466,18 +618,103 @@ export const BoardPage = () => {
             viewport={viewport}
           />
         </div>
-        <SidePanel
-          board={board}
-          instructionCount={listInstructionItems(store.file.boards).length}
-          onSelectFrame={setSelectedFrameId}
-          onSelectItem={setSelectedItemId}
-          review={store.status === "file" ? store.review : undefined}
-          selectedFrameId={selectedFrameId}
-          selectedItemId={selectedItemId}
-          storageLabel={storageLabel(store.status)}
-        />
+        {compact ? null : sidePanel()}
+        {compact && sheet === "library" && hasLibrary ? (
+          <BottomSheet
+            label="Components"
+            onClose={() => setSheet(undefined)}
+            sheetRef={sheetRef}
+          >
+            {library(sheetContent)}
+          </BottomSheet>
+        ) : null}
+        {compact && sheet === "details" ? (
+          <BottomSheet
+            label="Details"
+            onClose={() => setSheet(undefined)}
+            sheetRef={sheetRef}
+          >
+            {sidePanel(sheetContent)}
+          </BottomSheet>
+        ) : null}
       </div>
       {componentDrag ? <DragGhost drag={componentDrag} /> : null}
+    </div>
+  );
+};
+
+const contains = (
+  rect: DOMRect,
+  point: { x: number; y: number },
+): boolean =>
+  point.x >= rect.left &&
+  point.x <= rect.right &&
+  point.y >= rect.top &&
+  point.y <= rect.bottom;
+
+/** A panel over the bottom of the canvas, for screens too narrow to put it beside the canvas. */
+const BottomSheet = ({
+  children,
+  label,
+  onClose,
+  sheetRef,
+}: {
+  children: ReactNode;
+  label: string;
+  onClose: () => void;
+  sheetRef: React.RefObject<HTMLDivElement | null>;
+}) => {
+  const theme = useTheme();
+  return (
+    <div
+      aria-label={label}
+      ref={sheetRef}
+      role="region"
+      style={{
+        background: theme.background.content,
+        borderRadius: "12px 12px 0 0",
+        borderTop: `1px solid ${theme.appBorderColor}`,
+        bottom: 0,
+        boxShadow: "0 -8px 24px rgba(0,0,0,0.15)",
+        color: theme.color.defaultText,
+        display: "flex",
+        flexDirection: "column",
+        height: "55%",
+        left: 0,
+        overflow: "hidden",
+        position: "absolute",
+        right: 0,
+        zIndex: 5,
+      }}
+    >
+      <div
+        style={{
+          alignItems: "center",
+          borderBottom: `1px solid ${theme.appBorderColor}`,
+          display: "flex",
+          justifyContent: "space-between",
+          padding: "2px 4px 2px 12px",
+        }}
+      >
+        <span style={{ fontSize: 12, fontWeight: 700 }}>{label}</span>
+        <button
+          aria-label={`Close ${label}`}
+          onClick={onClose}
+          style={{
+            background: "transparent",
+            border: 0,
+            color: theme.textMutedColor,
+            cursor: "pointer",
+            fontSize: 20,
+            lineHeight: 1,
+            padding: "6px 12px",
+          }}
+          type="button"
+        >
+          ×
+        </button>
+      </div>
+      {children}
     </div>
   );
 };

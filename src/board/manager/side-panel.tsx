@@ -4,7 +4,13 @@
  */
 /** @jsxRuntime classic */
 import React from "react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useTheme } from "storybook/theming";
 import type {
   Board,
@@ -49,6 +55,8 @@ type Props = {
   selectedFrameId: string | undefined;
   selectedItemId: string | undefined;
   storageLabel: string;
+  /** Overrides the panel's own layout, e.g. to fill a bottom sheet on a phone. */
+  style?: CSSProperties;
 };
 
 export const SidePanel = ({
@@ -60,6 +68,7 @@ export const SidePanel = ({
   selectedFrameId,
   selectedItemId,
   storageLabel,
+  style,
 }: Props) => {
   const theme = useTheme();
   const [copied, setCopied] = useState(false);
@@ -90,6 +99,7 @@ export const SidePanel = ({
         fontSize: 12,
         overflowY: "auto",
         width: 320,
+        ...style,
       }}
     >
       {frame ? <FrameInspector frame={frame} /> : null}
@@ -227,7 +237,7 @@ const FrameInspector = ({ frame }: { frame: BoardFrame }) => {
             value={frame.height}
           />
         </div>
-        <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
           {SIZE_PRESETS.map((preset) => (
             <button
               key={preset.label}

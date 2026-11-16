@@ -5,6 +5,7 @@
 /** @jsxRuntime classic */
 import React from "react";
 import {
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   useMemo,
   useState,
@@ -56,9 +57,11 @@ type Props = {
   onAdd: (item: LibraryItem) => void;
   /** Pointer down on a story: the board follows the pointer and places the component on release. */
   onPickUp: (item: LibraryItem, event: ReactPointerEvent<HTMLElement>) => void;
+  /** Overrides the panel's own layout, e.g. to fill a bottom sheet on a phone. */
+  style?: CSSProperties;
 };
 
-export const ComponentLibrary = ({ onAdd, onPickUp }: Props) => {
+export const ComponentLibrary = ({ onAdd, onPickUp, style }: Props) => {
   const theme = useTheme();
   const library = useComponentLibrary();
   const [query, setQuery] = useState("");
@@ -75,6 +78,7 @@ export const ComponentLibrary = ({ onAdd, onPickUp }: Props) => {
         flexDirection: "column",
         fontSize: 12,
         width: 260,
+        ...style,
       }}
     >
       <div
@@ -107,7 +111,7 @@ export const ComponentLibrary = ({ onAdd, onPickUp }: Props) => {
           value={query}
         />
       </div>
-      <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 12 }}>
         {groups.map((group) => (
           <section key={group.designSystem.name} style={{ marginBottom: 16 }}>
             <h3

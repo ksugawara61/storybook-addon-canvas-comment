@@ -15,7 +15,8 @@ const MAX_RESULTS = 30;
 
 type StoryOption = { storyId: string; title: string };
 
-export const StoryPicker = () => {
+/** `fill` stretches the input across its row and the results under it, for a phone. */
+export const StoryPicker = ({ fill = false }: { fill?: boolean }) => {
   const theme = useTheme();
   const { index } = useStorybookState();
   const [query, setQuery] = useState("");
@@ -47,7 +48,7 @@ export const StoryPicker = () => {
   };
 
   return (
-    <div style={{ position: "relative" }}>
+    <div style={{ flex: fill ? 1 : undefined, minWidth: 0, position: "relative" }}>
       <input
         aria-label="Search stories to add"
         onBlur={() => setOpen(false)}
@@ -72,8 +73,9 @@ export const StoryPicker = () => {
           borderRadius: 4,
           color: theme.color.defaultText,
           fontSize: 12,
-          padding: "4px 8px",
-          width: 240,
+          boxSizing: "border-box",
+          padding: fill ? "6px 8px" : "4px 8px",
+          width: fill ? "100%" : 240,
         }}
         value={query}
       />
@@ -85,15 +87,16 @@ export const StoryPicker = () => {
             border: `1px solid ${theme.appBorderColor}`,
             borderRadius: 4,
             boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+            boxSizing: "border-box",
             left: 0,
             listStyle: "none",
             margin: "4px 0 0",
-            maxHeight: 360,
+            maxHeight: "min(360px, 50vh)",
             overflowY: "auto",
             padding: 4,
             position: "absolute",
             top: "100%",
-            width: 360,
+            width: fill ? "100%" : "min(360px, calc(100vw - 24px))",
             zIndex: 10,
           }}
         >

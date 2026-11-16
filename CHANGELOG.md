@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Make the board usable on a phone.
+  Below 900px wide, the toolbar fits in two rows (the controls row scrolls sideways), and the Components panel and the side panel (now **Details**) open as bottom sheets over the canvas instead of squeezing it to nothing.
+  Selecting an instruction or a component opens **Details**, so its note can be written.
+  Two fingers pan and pinch-zoom the board, even over a frame.
+  On a phone, the page fills the screen (Storybook gave it no height, so the canvas was empty), a **← Stories** button goes back to the stories, inputs use 16px text so iOS does not zoom in on them, and buttons are at least 32px tall on touch screens.
+
 ## 0.3.6
 
 - Send the board to a waiting coding agent.
