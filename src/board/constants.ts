@@ -16,6 +16,8 @@ export const ACTIVE_BOARD_STORAGE_KEY = `${BOARD_ID}/active-board`;
 export const LIBRARY_OPEN_STORAGE_KEY = `${BOARD_ID}/library-open`;
 
 export const ELEMENT_ACCENT = "#a855f7";
+/** Marks elements with an instruction to remove them. */
+export const REMOVE_ACCENT = "#dc2626";
 
 export const DEFAULT_FRAME_SIZE = { height: 720, width: 390 };
 export const FRAME_GAP = 64;

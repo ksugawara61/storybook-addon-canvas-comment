@@ -8,6 +8,7 @@ import {
   duplicateFrame,
   removeFrame,
   updateComponent,
+  updateEdit,
   upsertElementEdit,
 } from "./board-state.ts";
 import { FRAME_GAP } from "./constants.ts";
@@ -51,6 +52,26 @@ describe("duplicateFrame", () => {
     expect(duplicated.edits).toEqual([
       expect.objectContaining({ dx: 8, frameId }),
       expect.objectContaining({ dx: 8, frameId: copy?.id }),
+    ]);
+  });
+});
+
+describe("updateEdit", () => {
+  it("marks an element for removal and keeps it marked when it is moved again", () => {
+    const base = boardWithFrame();
+    const target = {
+      frameId: firstFrameId(base),
+      label: "button",
+      selector: "#root > button",
+    };
+    const first = upsertElementEdit(base, target, { dx: 0, dy: 0 });
+    expect(first.edit.remove).toBe(false);
+
+    const removed = updateEdit(first.board, first.edit.id, { remove: true });
+    const moved = upsertElementEdit(removed, target, { dx: 4, dy: 0 });
+
+    expect(moved.board.edits).toEqual([
+      expect.objectContaining({ dx: 4, id: first.edit.id, remove: true }),
     ]);
   });
 });

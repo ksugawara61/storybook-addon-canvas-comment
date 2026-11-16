@@ -25,7 +25,11 @@ import {
   updateEdit,
   updateFrame,
 } from "../board-state.ts";
-import { COMPONENT_ACCENT, ELEMENT_ACCENT } from "../constants.ts";
+import {
+  COMPONENT_ACCENT,
+  ELEMENT_ACCENT,
+  REMOVE_ACCENT,
+} from "../constants.ts";
 import { toInstructionsMarkdown } from "../instructions.ts";
 import { updateActiveBoard } from "./store.ts";
 
@@ -156,8 +160,9 @@ export const SidePanel = ({
             ))
         ) : (
           <p style={{ color: theme.textMutedColor, margin: 0 }}>
-            In Element mode, click an element in a frame to comment on it, or
-            drag it to leave a move. Hold Alt to pick its parent. Drag a
+            In Element mode, click an element in a frame to comment on it or
+            mark it for removal, or drag it to leave a move. Hold Alt to pick
+            its parent. Drag a
             component from the Components panel onto a frame to add it.
           </p>
         )}
@@ -259,13 +264,14 @@ const EditItem = ({
       noteRef.current?.focus();
     }
   }, [selected]);
-  const moved = edit.dx !== 0 || edit.dy !== 0;
+  const moved = !edit.remove && (edit.dx !== 0 || edit.dy !== 0);
+  const accent = edit.remove ? REMOVE_ACCENT : ELEMENT_ACCENT;
 
   return (
     <div
       onFocus={onSelect}
       style={{
-        border: `1px solid ${selected ? ELEMENT_ACCENT : theme.appBorderColor}`,
+        border: `1px solid ${selected ? accent : theme.appBorderColor}`,
         borderRadius: 4,
         marginBottom: 6,
         padding: 8,
@@ -274,7 +280,7 @@ const EditItem = ({
       <div style={{ alignItems: "center", display: "flex", gap: 6 }}>
         <span
           style={{
-            background: ELEMENT_ACCENT,
+            background: accent,
             borderRadius: 999,
             color: "#fff",
             fontSize: 10,
@@ -295,6 +301,7 @@ const EditItem = ({
           }}
           title={edit.selector}
         >
+          {edit.remove ? "Remove " : ""}
           {edit.label}
         </span>
         <button
@@ -311,6 +318,24 @@ const EditItem = ({
           type="button"
         >
           ×
+        </button>
+      </div>
+      <div style={{ marginTop: 4 }}>
+        <button
+          aria-pressed={edit.remove}
+          onClick={() =>
+            updateActiveBoard((board) =>
+              updateEdit(board, edit.id, { remove: !edit.remove }),
+            )
+          }
+          style={
+            edit.remove
+              ? buttonStyle(REMOVE_ACCENT)
+              : buttonStyle(theme.appBorderColor, theme.color.defaultText)
+          }
+          type="button"
+        >
+          {edit.remove ? "Keep element" : "Remove element"}
         </button>
       </div>
       {moved ? (

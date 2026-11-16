@@ -172,6 +172,7 @@ export const upsertElementEdit = (
     createdAt: now(),
     id: createId(),
     note: "",
+    remove: false,
   };
   return { board: touch({ ...board, edits: [...board.edits, edit] }), edit };
 };
@@ -179,7 +180,7 @@ export const upsertElementEdit = (
 export const updateEdit = (
   board: Board,
   editId: string,
-  patch: Partial<Pick<ElementEdit, "dx" | "dy" | "note">>,
+  patch: Partial<Pick<ElementEdit, "dx" | "dy" | "note" | "remove">>,
 ): Board =>
   touch({
     ...board,

@@ -29,6 +29,7 @@ const createEdit = (overrides?: Partial<ElementEdit>): ElementEdit => ({
   id: "edit-1",
   label: 'button "Save"',
   note: "",
+  remove: false,
   selector: "#storybook-root > button",
   ...overrides,
 });
@@ -97,6 +98,20 @@ describe("toInstructionsMarkdown", () => {
     ]);
 
     expect(markdown).toContain(': Change the label to "Save draft"');
+  });
+
+  it("writes a removal instead of the move for an element to remove", () => {
+    const markdown = toInstructionsMarkdown([
+      createBoard({
+        edits: [
+          createEdit({ dx: 12, note: "Not needed anymore", remove: true }),
+        ],
+      }),
+    ]);
+
+    expect(markdown).toContain(
+      '1. button "Save" (`#storybook-root > button`): remove this element / Not needed anymore',
+    );
   });
 
   it("writes a note on a frame under that frame, and other notes under the board", () => {

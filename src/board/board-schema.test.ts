@@ -66,6 +66,26 @@ describe("parseBoardFile", () => {
     });
   });
 
+  it("keeps the removal flag and defaults it to false for instructions saved before it existed", () => {
+    const parsed = parseBoardFile({
+      boards: [
+        {
+          edits: [edit("frame-1"), { ...edit("frame-1"), id: "removed", remove: true }],
+          frames: [frame],
+          id: "board-1",
+          name: "Compare",
+          notes: [],
+        },
+      ],
+      version: 1,
+    });
+
+    expect(parsed.boards[0]?.edits.map(({ remove }) => remove)).toEqual([
+      false,
+      true,
+    ]);
+  });
+
   it("loads a board saved before components existed", () => {
     const parsed = parseBoardFile({
       boards: [{ edits: [], frames: [frame], id: "board-1", name: "Old", notes: [] }],

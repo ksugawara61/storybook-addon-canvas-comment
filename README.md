@@ -39,7 +39,7 @@ The [Board](#board) section has a demo of the board page.
 | Replies | Each comment has a reply thread. Reviewers reply from the panel. Coding agents reply with the `reply` CLI to explain what they changed. The thread is shown in the panel and in the pin tooltip. |
 | Review-completion signal | A "Complete review" button in the panel flips a review status flag. A waiting coding agent can detect it. "Reopen review" flips it back. |
 | Agent-friendly output | The `dom-map` and `wait-comments` CLIs pair each comment with its saved DOM snapshot. They emit JSON built for LLM consumption. |
-| Board | A board page (`/?path=/board/`) lays stories out as frames to compare variants. Drag elements in a frame to leave move instructions, comment on them, and put notes on the board. Drag components from a design system onto a frame to show what to add. The instructions are written as Markdown for coding agents. See [Board](#board). |
+| Board | A board page (`/?path=/board/`) lays stories out as frames to compare variants. Drag elements in a frame to leave move instructions, mark them for removal, comment on them, and put notes on the board. Drag components from a design system onto a frame to show what to add. The instructions are written as Markdown for coding agents. See [Board](#board). |
 
 ## Requirements
 
@@ -180,13 +180,15 @@ The board has four modes. Switch them in the toolbar or with a key:
 | --- | --- | --- |
 | Select | `V` | Select, move and resize frames. |
 | Interact | `I` | Use the stories as usual, for example to open a menu before you comment. |
-| Element | `E` | Click an element in a frame to comment on it. Drag it to leave a move instruction. |
+| Element | `E` | Click an element in a frame to comment on it or mark it for removal. Drag it to leave a move instruction. |
 | Note | `N` | Click the board to put a note. A note placed on a frame belongs to that frame. |
 
 In Element mode, pressing an element picks its closest interactive ancestor (`button`, `a`, `[role]`, `[tabindex]` and so on).
 So pressing the text inside a button picks the button.
 Hold `Alt` to pick one level further out.
 Each instruction gets a numbered pin, and moves are previewed inside the frame with a CSS `translate`.
+To delete an element, click it and press **Remove element** on its instruction in the side panel.
+The element is faded out in the frame and its pin turns red; press **Keep element** to undo.
 The story code does not change; a coding agent or a person makes the real fix.
 
 ### Design system components
@@ -275,6 +277,7 @@ Moves, and the positions of components to add, are in the story's rendered CSS p
 
 1. button "Sign up" (`#storybook-root > form > div:nth-of-type(3) > button:nth-of-type(2)`): move left 131px, move down 94px / Put Sign up on its own row, full width
 2. heading "Create your account" (`#storybook-root > form > h2`): Use the title from Short Title
+3. link "Forgot password?" (`#storybook-root > form > a`): remove this element
 
 Components to add:
 
