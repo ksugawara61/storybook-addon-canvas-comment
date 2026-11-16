@@ -4,6 +4,7 @@
 //
 // Usage: node .github/scripts/verify-package.mjs <package.tgz>
 import { execFileSync } from "node:child_process";
+import { posix } from "node:path";
 
 const tarball = process.argv[2];
 if (!tarball) {
@@ -37,6 +38,29 @@ const entries = [
 for (const entry of new Set(entries)) {
   const file = entry.replace(/^\.\//, "");
   if (!files.has(file)) errors.push(`missing ${file}`);
+}
+
+// The Pages Functions are deployed from the shipped src/ tree, so every file they
+// import, directly or not, has to be in the tarball.
+const readPacked = (file) =>
+  execFileSync("tar", ["-xzOf", tarball, `package/${file}`], { encoding: "utf8" });
+const pending = [...files].filter(
+  (file) => file.startsWith("src/cloudflare/functions/") && file.endsWith(".ts"),
+);
+const seen = new Set(pending);
+while (pending.length > 0) {
+  const file = pending.pop();
+  for (const [, specifier] of readPacked(file).matchAll(/from\s+"(\.{1,2}\/[^"]+)"/g)) {
+    const base = posix.normalize(posix.join(posix.dirname(file), specifier));
+    // Wrangler's bundler resolves extensionless imports too.
+    const imported = [base, `${base}.ts`].find((candidate) => files.has(candidate));
+    if (!imported) {
+      errors.push(`${file} imports ${base}, which is not in the package`);
+    } else if (!seen.has(imported)) {
+      seen.add(imported);
+      pending.push(imported);
+    }
+  }
 }
 
 for (const script of ["preinstall", "install", "postinstall", "prepare"]) {

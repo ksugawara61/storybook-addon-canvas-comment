@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { listInstructionItems, resolveInstructionItems } from "./board-items.ts";
+import {
+  listInstructionItems,
+  readResolveRequest,
+  resolveInstructionItems,
+} from "./board-items.ts";
 import type { Board, BoardFile } from "./board-schema.ts";
 
 const board = (id: string, overrides: Partial<Board> = {}): Board => ({
@@ -105,5 +109,30 @@ describe("resolveInstructionItems", () => {
 
     expect(result.resolved).toHaveLength(5);
     expect(listInstructionItems(result.file.boards)).toEqual([]);
+  });
+});
+
+describe("readResolveRequest", () => {
+  it("reads ids", () => {
+    expect(readResolveRequest({ ids: ["a", "b"] })).toEqual({
+      ids: new Set(["a", "b"]),
+    });
+  });
+
+  it("reads all", () => {
+    expect(readResolveRequest({ all: true })).toEqual({});
+  });
+
+  it.each([
+    undefined,
+    null,
+    {},
+    { ids: [] },
+    { ids: [""] },
+    { ids: [1] },
+    { all: false },
+    { all: true, ids: ["a"] },
+  ])("rejects %j, so a malformed body never clears the board", (body) => {
+    expect(readResolveRequest(body)).toBeUndefined();
   });
 });

@@ -339,6 +339,8 @@ Components to add:
 A statically built Storybook has no dev-server API.
 There the board saves to the browser's `localStorage`, so only that browser sees it.
 Use **Copy as Markdown** to hand the instructions over.
+With the preset option `apiUrl`, a static build saves the board through the hosted API instead, next to the comments.
+See [Hosted mode](#hosted-mode-cloudflare-pages--r2).
 
 ### Sending the board to a coding agent
 
@@ -353,8 +355,10 @@ A coding agent can wait for the board, apply its instructions, and hand it back,
 5. The agent runs `canvas-comments-wait-board` again, which sets the status back to **Editing**.
 
 **Reopen** takes the board back before an agent picks it up.
-The **Agent** section is shown only with the dev server, because a static build has no API to signal through.
+The **Agent** section is shown with the dev server, and in a static build that uses the [hosted API](#hosted-mode-cloudflare-pages--r2).
+A static build without it has no API to signal through.
 The [`board-fix` skill](#claude-code-plugin) runs this loop in Claude Code.
+The `board-fix-remote` skill runs it against a pull request's preview Storybook, and pushes each round's fixes to the PR branch.
 
 The status is stored in `board.json` under `review`, in the same shape as the comments' review status:
 
@@ -382,6 +386,8 @@ pnpm exec canvas-comments-wait-board \
 - `--timeout-ms <ms>` — give up after this long, with exit code `2`. `0` waits indefinitely (default).
 - `--poll-interval-ms <ms>` — polling interval (default `2000`).
 - `--no-reset` — do not reset the status first, e.g. when waiting again after a timeout.
+- `--board-file <path>` — override the default path.
+- `--api-url <url>` — wait on the [hosted board API](#hosted-mode-cloudflare-pages--r2) instead of `board.json`.
 
 `board-resolve` removes applied instructions — element edits, components to add, and notes — and keeps the frames.
 It prints the removed items as JSON:
@@ -393,6 +399,7 @@ pnpm exec canvas-comments-board-resolve --ids 3f2a...,9c1d...
 - `--ids <id,id,...>` — the items to remove, from `wait-board --format json`. Instructions added since stay on the board.
 - `--all` — remove every instruction on every board.
 - `--board-file <path>` — override the default path.
+- `--api-url <url>` — remove them through the [hosted board API](#hosted-mode-cloudflare-pages--r2).
 
 The board reads each frame's DOM directly, so the manager and the preview must be served from the same origin.
 That is the default for `storybook dev` and `storybook build`.
@@ -655,11 +662,14 @@ They store comments in a Cloudflare R2 bucket instead:
   - `PATCH/DELETE /api/canvas-comments/<app>/comments/:id`
   - `POST /api/canvas-comments/<app>/comments/:id/replies`
   - `GET/POST /api/canvas-comments/<app>/review`
+  - `GET/PUT /api/canvas-comments/<app>/board`
+  - `GET/POST /api/canvas-comments/<app>/board/review`
+  - `POST /api/canvas-comments/<app>/board/resolve`
 - `src/cloudflare/wrangler.example.toml` — example Pages configuration
   - Bind an R2 bucket as `CANVAS_COMMENTS_BUCKET`
 
 The Functions import files from outside `src/cloudflare/`.
-They are `src/comment-schema.ts`, `src/constants.ts`, `src/review-schema.ts`, `src/types.ts` and `src/storage/*`.
+They are `src/board/board-items.ts`, `src/board/board-schema.ts`, `src/comment-schema.ts`, `src/constants.ts`, `src/review-schema.ts`, `src/types.ts` and `src/storage/*`.
 The installed package ships all of them under `node_modules/storybook-addon-canvas-comments/src/`.
 Copy that whole `src/` tree to a working directory and run `wrangler pages deploy` from its `src/cloudflare`.
 Copying only `src/cloudflare/` is not enough.
@@ -670,8 +680,17 @@ Writes are conditional on the object's etag.
 If another writer changed the object in the meantime, the function re-reads it and retries.
 So concurrent writes do not lose comments.
 
-The Pages Functions do not store boards.
-In hosted mode the [board](#board) saves to each browser's `localStorage`.
+The [board](#board) is stored in the same bucket, as `<app>/board.json`.
+It has the same format as the dev server's `board.json`, with the board's review status in it.
+So the board page, **Send to agent**, and the `wait-board` and `board-resolve` CLIs work in hosted mode too.
+The board API sits next to the comments API: `apiUrl` `.../<app>/comments` gives `.../<app>/board`.
+
+- `GET` returns `{ "version": 1, "boards": [...] }`, and `PUT` replaces the boards and keeps the review status.
+  A body without a `boards` array is rejected with `400`, so a bad request cannot wipe the boards.
+- `GET/POST .../board/review` reads and sets the board's review status, like `/__canvas-comments/board/review`.
+- `POST .../board/resolve` removes applied instructions and returns them as `{ "resolved": [...] }`.
+  The body is `{ "ids": ["..."] }`, or `{ "all": true }` for every instruction.
+  It runs as one conditional write, so instructions the board page saved meanwhile are kept.
 
 One Pages project can serve several apps, such as separate Storybooks for different apps.
 Pick the app with the `<app>` path segment.
@@ -716,16 +735,57 @@ CF_ACCESS_CLIENT_ID=<client id> CF_ACCESS_CLIENT_SECRET=<client secret> \
   --api-url https://your-storybook.pages.dev/api/canvas-comments/<app>/comments
 ```
 
+`wait-board` and `board-resolve` take the same `--api-url`, the comments URL, and use the board API next to it.
+A URL ending in `/board` works too:
+
+```bash
+pnpm exec canvas-comments-wait-board --format json \
+  --api-url https://your-storybook.pages.dev/api/canvas-comments/<app>/comments
+pnpm exec canvas-comments-board-resolve --ids 3f2a...,9c1d... \
+  --api-url https://your-storybook.pages.dev/api/canvas-comments/<app>/comments
+```
+
+### Pull request previews
+
+Cloudflare Pages deploys every branch to a preview URL, such as `https://<branch>.<project>.pages.dev`.
+The R2 binding in `wrangler.toml` applies to preview deployments too, so the previews share the bucket with production.
+To give each pull request its own comments and board, put the branch in the `<app>` name.
+Cloudflare Pages sets `CF_PAGES_BRANCH` while it builds; in GitHub Actions, use `GITHUB_HEAD_REF`:
+
+```ts
+// .storybook/main.ts
+const branch = (process.env.CF_PAGES_BRANCH ?? process.env.GITHUB_HEAD_REF ?? "local")
+  .toLowerCase()
+  .replace(/[^a-z0-9_-]+/g, "-");
+
+const config: StorybookConfig = {
+  addons: [
+    {
+      name: "storybook-addon-canvas-comments",
+      options: { apiUrl: `/api/canvas-comments/my-app-${branch}/comments` },
+    },
+  ],
+};
+```
+
+Use the branch rather than the commit, so new pushes keep the same comments and board.
+A reviewer then works on `https://<branch>.<project>.pages.dev/?path=/board/` and clicks **Send to agent**.
+A coding agent anywhere that can reach the preview, such as Claude Code on the web, waits with `wait-board --api-url`, pushes the fixes to the branch, and clears the instructions with `board-resolve --api-url`.
+The [`board-fix-remote` skill](#claude-code-plugin) runs this loop.
+
 ## Claude Code plugin
 
 This repository is also a [Claude Code plugin marketplace](https://code.claude.com/docs/en/plugin-marketplaces).
-The `canvas-comments` plugin ships two skills:
+The `canvas-comments` plugin ships three skills:
 
 - `canvas-issues` reads the open comments with the `dom-map` CLI and finds the component each one points at.
   It then files one GitHub issue per feature, labeled `design`.
   It needs the [GitHub CLI](https://cli.github.com/) (`gh`), signed in to the repository.
 - `board-fix` waits for **Send to agent** on the [board](#sending-the-board-to-a-coding-agent) with the `wait-board` CLI.
   It applies the instructions to the code, clears them with `board-resolve`, and waits for the next round.
+- `board-fix-remote` does the same for a pull request's [preview Storybook](#pull-request-previews), through the hosted board API.
+  It finds the PR and its preview, applies the instructions on the PR branch, pushes, and then clears them.
+  It needs no local Storybook, so it works in Claude Code on the web.
 
 Install it in Claude Code:
 
@@ -765,6 +825,19 @@ To have Claude fix what you send from the board, start Storybook and ask Claude 
 Claude waits in the background; click **Send to agent** on the board whenever a round of instructions is ready.
 Pass `once` to stop after one round.
 For project-specific steps, such as which checks to run after a fix, add `.claude/board-fix.md` at the repository root.
+
+To have Claude fix what a reviewer sends from a pull request's preview, ask it to "watch the board on the PR preview and fix it", or run `/canvas-comments:board-fix-remote`.
+Pass `pr=<number>` to pick the PR, and `api-url=<url>` or `storybook-url=<url>` when Claude cannot find the preview by itself.
+The machine Claude runs on must reach the preview host, and needs `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET` when Cloudflare Access protects it.
+Add `.claude/board-fix-remote.md` at the repository root for the preview URL and `<app>` name of a branch, the checks to run, and how to commit:
+
+```markdown
+- Storybook: packages/web (`pnpm --filter web exec ...`)
+- Preview: https://<branch alias>.my-storybook.pages.dev, where the alias is the branch name in lowercase with other characters as `-`
+- API: <preview>/api/canvas-comments/web-<branch alias>/comments
+- Checks: `pnpm --filter web typecheck` and `pnpm --filter web test`
+- Commit messages: `fix(ui): <what changed> (board)`
+```
 
 ## Development
 

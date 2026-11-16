@@ -1,10 +1,4 @@
-import {
-  boardPathsFromFile,
-  createBoardPaths,
-  readBoardFile,
-  writeBoardFile,
-} from "../board/api.ts";
-import { resolveInstructionItems } from "../board/board-items.ts";
+import { BOARD_SOURCE_HELP, openBoardSource } from "./board-source.ts";
 import { parseOptions, runCli } from "./options.ts";
 
 const HELP = `Usage:
@@ -22,14 +16,13 @@ Options:
                               canvas-comments-wait-board --format json.
                               Repeat the option or separate ids with commas.
   --all                       Remove every instruction on every board.
-  --board-file <path>         Path to board.json. Defaults to
-                              .storybook/canvas-comments/board.json relative to
-                              the current working directory.
+${BOARD_SOURCE_HELP}
   --help                      Show this help.
 `;
 
 type Options = {
   all: boolean;
+  apiUrl?: string;
   boardFile?: string;
   ids: string[];
 };
@@ -45,6 +38,9 @@ const main = async () => {
         },
       },
       values: {
+        "--api-url": (current, value) => {
+          current.apiUrl = value;
+        },
         "--board-file": (current, value) => {
           current.boardFile = value;
         },
@@ -70,17 +66,9 @@ const main = async () => {
     throw new Error("Pass either --ids <id,id,...> or --all.");
   }
 
-  const paths = options.boardFile
-    ? boardPathsFromFile(options.boardFile)
-    : createBoardPaths();
-  const { file, resolved } = resolveInstructionItems(
-    await readBoardFile(paths.board),
+  const resolved = await openBoardSource(options).resolve(
     options.all ? undefined : new Set(options.ids),
   );
-
-  if (resolved.length > 0) {
-    await writeBoardFile(paths, file);
-  }
 
   const missing = options.ids.filter(
     (id) => !resolved.some((item) => item.id === id),

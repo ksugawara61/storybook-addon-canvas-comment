@@ -17,9 +17,11 @@ import type { Board, BoardFrame } from "../board-schema.ts";
 import { listInstructionItems } from "../board-items.ts";
 import { addComponent } from "../board-state.ts";
 import {
+  BOARD_API_PATH,
   BOARD_FILE_RELATIVE_PATH,
   COMPONENT_ACCENT,
   DEFAULT_COMPONENT_SIZE,
+  getBoardApiPath,
   INSTRUCTIONS_FILE_RELATIVE_PATH,
   LIBRARY_OPEN_STORAGE_KEY,
 } from "../constants.ts";
@@ -88,11 +90,19 @@ type ComponentDrag = {
   item: LibraryItem;
 };
 
-const STORAGE_LABELS = {
-  file: `Saved to ${BOARD_FILE_RELATIVE_PATH} (and ${INSTRUCTIONS_FILE_RELATIVE_PATH})`,
-  loading: "Loading…",
-  local: "Saved in this browser (localStorage)",
+const fileStorageLabel = (): string => {
+  const apiPath = getBoardApiPath();
+  return apiPath === BOARD_API_PATH
+    ? `Saved to ${BOARD_FILE_RELATIVE_PATH} (and ${INSTRUCTIONS_FILE_RELATIVE_PATH})`
+    : `Saved to ${apiPath}`;
 };
+
+const storageLabel = (status: "file" | "loading" | "local"): string =>
+  status === "file"
+    ? fileStorageLabel()
+    : status === "loading"
+      ? "Loading…"
+      : "Saved in this browser (localStorage)";
 
 export const BoardPage = () => {
   const theme = useTheme();
@@ -464,7 +474,7 @@ export const BoardPage = () => {
           review={store.status === "file" ? store.review : undefined}
           selectedFrameId={selectedFrameId}
           selectedItemId={selectedItemId}
-          storageLabel={STORAGE_LABELS[store.status]}
+          storageLabel={storageLabel(store.status)}
         />
       </div>
       {componentDrag ? <DragGhost drag={componentDrag} /> : null}
