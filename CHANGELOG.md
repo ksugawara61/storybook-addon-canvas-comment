@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.3.2
+
 ## 0.3.1
 
 - Set a frame's or a placed component's args per prop on the board.
