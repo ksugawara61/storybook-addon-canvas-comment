@@ -205,6 +205,7 @@ It then shows the Markdown the board writes for a coding agent.
 
 List the design systems in the preset options.
 Each one is a set of stories: the stories under a title prefix in this Storybook, or the stories of a [composed Storybook](https://storybook.js.org/docs/sharing/storybook-composition).
+A library without stories works too; see [Libraries without stories](#libraries-without-stories).
 
 ```ts
 // .storybook/main.ts
@@ -252,6 +253,51 @@ Stories of a composed Storybook render from its URL.
 When that URL is on another origin, the board cannot read the rendered story.
 So the component keeps the default 320×64 box and Storybook's own padding; resize it by hand.
 The composed Storybook also has to allow the manager's origin with CORS, as for any composed Storybook.
+
+#### Libraries without stories
+
+A component library does not need stories of its own to be on the board.
+Set `components`, and the preset writes a story for each component, which renders it with the args you give it on the board.
+
+```ts
+// .storybook/main.ts
+const config: StorybookConfig = {
+  addons: [
+    {
+      name: "storybook-addon-canvas-comments",
+      options: {
+        designSystems: [
+          {
+            name: "@acme/ui",
+            // Every component the module exports
+            components: "auto",
+            // Exports to leave out of "auto"
+            exclude: ["ThemeProvider"],
+            // Args for the props a component cannot render without
+            args: { Alert: { title: "Saved" } },
+          },
+        ],
+      },
+    },
+  ],
+};
+```
+
+| Option | Description |
+| --- | --- |
+| `components` | `"auto"` lists the components that `importPath` exports. An array, such as `["Alert", "Badge"]`, names them. |
+| `exclude` | With `"auto"`, exports to leave out. |
+| `args` | The args of a component's story, by component name. Each component has one story, `Default`. |
+
+`"auto"` reads the module with TypeScript: its source, or its type declarations for a built package.
+It lists the exports with a capitalized name that can be called or constructed, such as function components, `forwardRef` and `memo` components, and classes.
+TypeScript has to be installed in the project; otherwise list the components.
+`ref` and `titlePrefix` are ignored with `components`.
+
+The stories are written under `node_modules/.cache/storybook-addon-canvas-comments/library/` in the directory where Storybook runs, each time Storybook starts.
+They are tagged `canvas-comments-library`, so they are hidden from the sidebar, from docs pages and from the test runner, and the board's story search leaves them out.
+They are still in `index.json`; leave them out of any tool that reads it, such as a visual regression test, by that tag.
+They render in this Storybook with its decorators, such as a theme provider, and the board reads their props for the side panel when Storybook's docgen can read the component.
 
 ### Board instructions for coding agents
 

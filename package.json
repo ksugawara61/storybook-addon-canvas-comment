@@ -70,7 +70,13 @@
   "peerDependencies": {
     "react": ">=18",
     "storybook": ">=8",
+    "typescript": ">=5",
     "vite": ">=5"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
   },
   "repository": {
     "type": "git",
