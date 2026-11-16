@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Set a frame's or a placed component's args per prop on the board.
+  The side panel reads the story's argTypes and shows an input for each prop: a checkbox for booleans, a select for options, and number and text fields, with the prop's type, its default and whether it is required.
+  `ReactNode` props such as `children` are edited as text.
+  **Reset** removes an override, and the args are still saved in Storybook's URL format (`label:Save;disabled:!true`), which **Raw args** edits for what the inputs do not cover.
+  The panel warns when a text value has characters Storybook ignores in URL args.
+
 ## 0.3.0
 
 - Add design system components to the board.

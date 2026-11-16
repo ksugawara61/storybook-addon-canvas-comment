@@ -9,6 +9,7 @@ import type { ComponentPlacement } from "../board-schema.ts";
 import { updateComponent } from "../board-state.ts";
 import { COMPONENT_ACCENT } from "../constants.ts";
 import { startDrag } from "./drag.ts";
+import { loadStoryArgTypes } from "./story-arg-types.ts";
 import { updateActiveBoard } from "./store.ts";
 import type { BoardMode } from "./types.ts";
 
@@ -156,6 +157,7 @@ export const BoardComponent = ({
       return;
     }
     fitPreview(doc);
+    void loadStoryArgTypes(doc.defaultView, component.storyId, component.refId);
     if (pendingAutoSize.delete(component.id)) {
       measureHeight(doc, (height) =>
         updateActiveBoard((board) =>

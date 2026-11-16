@@ -4,13 +4,7 @@
  */
 /** @jsxRuntime classic */
 import React from "react";
-import {
-  type CSSProperties,
-  type ReactNode,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTheme } from "storybook/theming";
 import type {
   Board,
@@ -31,7 +25,9 @@ import {
   REMOVE_ACCENT,
 } from "../constants.ts";
 import { toInstructionsMarkdown } from "../instructions.ts";
+import { ArgsEditor } from "./args-editor.tsx";
 import { updateActiveBoard } from "./store.ts";
+import { buttonStyle, inputStyle } from "./styles.ts";
 
 const SIZE_PRESETS = [
   { height: 844, label: "Mobile", width: 390 },
@@ -183,8 +179,6 @@ export const SidePanel = ({
 
 const FrameInspector = ({ frame }: { frame: BoardFrame }) => {
   const theme = useTheme();
-  const [args, setArgs] = useState(frame.args);
-  useEffect(() => setArgs(frame.args), [frame.args]);
   const patch = (value: Partial<Omit<BoardFrame, "id">>) =>
     updateActiveBoard((board) => updateFrame(board, frame.id, value));
 
@@ -200,17 +194,12 @@ const FrameInspector = ({ frame }: { frame: BoardFrame }) => {
       <Field label="Story">
         <code style={{ wordBreak: "break-all" }}>{frame.storyId}</code>
       </Field>
-      <Field label="Args (e.g. label:Save;disabled:!true)">
-        <input
-          onBlur={() => patch({ args })}
-          onChange={(event) => setArgs(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              patch({ args });
-            }
-          }}
-          style={inputStyle(theme)}
-          value={args}
+      <Field as="div" label="Args">
+        <ArgsEditor
+          args={frame.args}
+          label={frame.label}
+          onChange={(args) => patch({ args })}
+          storyId={frame.storyId}
         />
       </Field>
       <Field label="Size">
@@ -399,8 +388,6 @@ const ComponentItem = ({
 }) => {
   const theme = useTheme();
   const noteRef = useRef<HTMLTextAreaElement>(null);
-  const [args, setArgs] = useState(component.args);
-  useEffect(() => setArgs(component.args), [component.args]);
   useEffect(() => {
     if (selected) {
       noteRef.current?.focus();
@@ -468,19 +455,36 @@ const ComponentItem = ({
         {component.y}px · {component.width}×{component.height}
         {component.anchorLabel ? ` · over ${component.anchorLabel}` : ""}
       </div>
-      <input
-        aria-label={`Args for ${component.componentName}`}
-        onBlur={() => patch({ args })}
-        onChange={(event) => setArgs(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            patch({ args });
-          }
-        }}
-        placeholder="Args (e.g. label:Save)"
-        style={{ ...inputStyle(theme), marginTop: 6 }}
-        value={args}
-      />
+      {selected ? (
+        <div style={{ marginTop: 6 }}>
+          <ArgsEditor
+            args={component.args}
+            label={component.componentName}
+            onChange={(args) => patch({ args })}
+            refId={component.refId}
+            storyId={component.storyId}
+          />
+        </div>
+      ) : (
+        <button
+          onClick={onSelect}
+          style={{
+            background: "transparent",
+            border: 0,
+            color: theme.color.secondary,
+            cursor: "pointer",
+            display: "block",
+            fontSize: 11,
+            marginTop: 4,
+            padding: 0,
+            textAlign: "left",
+            wordBreak: "break-all",
+          }}
+          type="button"
+        >
+          {component.args ? `Edit args (${component.args})` : "Edit args"}
+        </button>
+      )}
       <textarea
         aria-label={`Instruction for ${component.componentName}`}
         onChange={(event) => patch({ note: event.target.value })}
@@ -524,10 +528,19 @@ const Section = ({
   );
 };
 
-const Field = ({ children, label }: { children: ReactNode; label: string }) => {
+const Field = ({
+  as: Tag = "label",
+  children,
+  label,
+}: {
+  /** A `div` for fields with several inputs, which a single label cannot name. */
+  as?: "div" | "label";
+  children: ReactNode;
+  label: string;
+}) => {
   const theme = useTheme();
   return (
-    <label style={{ display: "block", marginBottom: 10 }}>
+    <Tag style={{ display: "block", marginBottom: 10 }}>
       <span
         style={{
           color: theme.textMutedColor,
@@ -539,7 +552,7 @@ const Field = ({ children, label }: { children: ReactNode; label: string }) => {
         {label}
       </span>
       {children}
-    </label>
+    </Tag>
   );
 };
 
@@ -569,24 +582,3 @@ const NumberInput = ({
     />
   );
 };
-
-const inputStyle = (theme: ReturnType<typeof useTheme>): CSSProperties => ({
-  background: theme.background.app,
-  border: `1px solid ${theme.appBorderColor}`,
-  borderRadius: 4,
-  boxSizing: "border-box",
-  color: theme.color.defaultText,
-  font: "inherit",
-  padding: "4px 6px",
-  width: "100%",
-});
-
-const buttonStyle = (background: string, color = "#fff"): CSSProperties => ({
-  background,
-  border: 0,
-  borderRadius: 4,
-  color,
-  cursor: "pointer",
-  fontSize: 11,
-  padding: "4px 8px",
-});
