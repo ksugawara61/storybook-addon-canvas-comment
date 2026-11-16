@@ -11,7 +11,8 @@ A companion CLI lets an agent block until you finish reviewing.
 The agent then receives all open comments as structured JSON.
 
 A **board** page lays several stories side by side, like a design canvas.
-You can duplicate a frame, drag elements to where they should go, and leave notes.
+You can duplicate a frame, set its props, drag elements to where they should go, mark elements for removal, and leave notes.
+You can also drop components from your design system onto a frame.
 The board writes those instructions as Markdown for a coding agent.
 
 ## Demo
@@ -159,10 +160,10 @@ Pass `--no-reset` to skip the reset. Other options:
 The board compares stories side by side and collects fix instructions across them.
 Open it at `/?path=/board/`, or press **+ Board** in the toolbar of a story to add that story and open the board.
 
-![Adding stories to the board, duplicating a frame, moving and commenting on elements, leaving a note, and the Markdown handed to a coding agent](docs/images/board-demo.gif)
+![Adding stories to the board, duplicating a frame, setting its title prop, moving, removing and commenting on elements, leaving a note, and the Markdown handed to a coding agent](docs/images/board-demo.gif)
 
 The demo adds two SignupForm stories and duplicates one of them.
-In the copy, it moves the **Sign up** button and comments on the heading.
+In the copy, it sets the `title` prop in the side panel, moves the **Sign up** button, marks the **Cancel** button for removal, and comments on the heading.
 It then leaves a note and shows the Markdown the board writes for a coding agent.
 
 | Action | How |
@@ -197,11 +198,11 @@ The board can list the components of a design system, such as a `@acme/ui` packa
 Drag one onto a frame to show where it should go.
 The board renders the component's story in place, and writes an instruction to add it, with its import, to the Markdown for coding agents.
 
-![Dragging an Alert and a Checkbox from the Components panel onto the sign-up form, giving them args and notes, and the Markdown handed to a coding agent](docs/images/board-components.gif)
+![Dragging an Alert and a Checkbox from the Components panel onto the sign-up form, setting the Checkbox's props, leaving notes, and the Markdown handed to a coding agent](docs/images/board-components.gif)
 
 The demo searches the **Components** panel of the example design system and drags an Alert above the sign-up form.
-It drops a Checkbox on the form, gives it args and a note, and moves the Alert.
-It then shows the Markdown the board writes for a coding agent.
+It drops a Checkbox on the form, sets its `label` and `defaultChecked` props in the side panel, and gives it a note.
+It then moves the Alert and shows the Markdown the board writes for a coding agent.
 
 List the design systems in the preset options.
 Each one is a set of stories: the stories under a title prefix in this Storybook, or the stories of a [composed Storybook](https://storybook.js.org/docs/sharing/storybook-composition).
@@ -243,7 +244,7 @@ The panel groups the stories by component, and each story is a variant you can d
   The component goes where you drop it, and takes the height of its rendered story.
 - Click a story, or focus it and press `Enter`, to add it to the top-left of the selected frame (or of the first frame).
 - Drag a placed component to move it, and drag its bottom-right corner to resize it.
-- In the side panel, set its props (or type raw args in Storybook's URL format, such as `title:Saved`), and describe how to use it.
+- Select it to set its props in the side panel, with the same inputs as a frame's (or type **Raw args** in Storybook's URL format, such as `title:Saved`), and describe how to use it.
 
 The component name comes from the last part of the story title.
 `UI/Alert` gives `Alert`, and an auto title such as `buttons/primary-button` gives `PrimaryButton`.
@@ -311,6 +312,7 @@ With the dev server, the board saves two files under the directory where Storybo
 `board-instructions.md` is rewritten on every save, so an agent can read it as-is.
 **Copy as Markdown** in the side panel copies the same Markdown for the current board.
 Each element is identified by its role and accessible name, and by a CSS selector.
+A frame's args follow its story id.
 Moves, and the positions of components to add, are in the story's rendered CSS px:
 
 ```markdown
@@ -318,16 +320,16 @@ Moves, and the positions of components to add, are in the story's rendered CSS p
 
 ### Example/SignupForm / Default (copy)
 
-- story: `example-signupform--default`
+- story: `example-signupform--default` / args: `title:Join the beta`
 - size: 390×720
 
-1. button "Sign up" (`#storybook-root > form > div:nth-of-type(3) > button:nth-of-type(2)`): move left 131px, move down 94px / Put Sign up on its own row, full width
-2. heading "Create your account" (`#storybook-root > form > h2`): Use the title from Short Title
-3. link "Forgot password?" (`#storybook-root > form > a`): remove this element
+1. button "Sign up" (`#storybook-root > form > div:nth-of-type(3) > button:nth-of-type(2)`): move left 106px, move down 92px / Put Sign up on its own row, full width
+2. button "Cancel" (`#storybook-root > form > div:nth-of-type(3) > button:nth-of-type(1)`): remove this element
+3. heading "Join the beta" (`#storybook-root > form > h2`): Keep the title to one line
 
 Components to add:
 
-- Add `Checkbox` (`import { Checkbox } from "@example/ui"`, as in story `ui-checkbox--unchecked`, args `label:I agree to the Terms`) at x 41px, y 445px, 320×17, over form "Sign up" (`#storybook-root > form`) / Required before Sign up
+- Add `Checkbox` (`import { Checkbox } from "@example/ui"`, as in story `ui-checkbox--unchecked`, args `label:I agree to the Terms;defaultChecked:!true`) at x 62px, y 447px, 320×17, over form "Sign up" (`#storybook-root > form`) / Required before Sign up
 
 ### Board notes
 
