@@ -242,6 +242,7 @@ The panel groups the stories by component, and each story is a variant you can d
 
 - Drag a story onto a frame. The frame is highlighted while the pointer is over it.
   The component goes where you drop it, and takes the height of its rendered story.
+  A story whose content is all positioned (`position: absolute`), such as a floating action button, fills the box like a screen instead.
 - Click a story, or focus it and press `Enter`, to add it to the top-left of the selected frame (or of the first frame).
 - Drag a placed component to move it, and drag its bottom-right corner to resize it.
 - Select it to set its props in the side panel, with the same inputs as a frame's (or type **Raw args** in Storybook's URL format, such as `title:Saved`), and describe how to use it.

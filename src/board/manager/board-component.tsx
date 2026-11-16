@@ -9,6 +9,7 @@ import type { ComponentPlacement } from "../board-schema.ts";
 import { updateComponent } from "../board-state.ts";
 import { COMPONENT_ACCENT } from "../constants.ts";
 import { startDrag } from "./drag.ts";
+import { FILL_CSS, fitRoot } from "./preview-fit.ts";
 import { loadStoryArgTypes } from "./story-arg-types.ts";
 import { updateActiveBoard } from "./store.ts";
 import type { BoardMode } from "./types.ts";
@@ -25,7 +26,7 @@ html, body { background: transparent !important; overflow: hidden !important; }
 body.sb-show-main { display: block !important; margin: 0 !important; min-height: 0 !important; padding: 0 !important; }
 body.sb-show-main #storybook-root { margin: 0 !important; padding: 0 !important; }
 html, body, body.sb-show-main #storybook-root { height: auto !important; min-height: 0 !important; }
-`;
+${FILL_CSS}`;
 
 // Components placed in this session take the height of their rendered story once it loads.
 const pendingAutoSize = new Set<string>();
@@ -68,32 +69,32 @@ const fitPreview = (doc: Document): void => {
   doc.head.append(style);
 };
 
-/** Calls back with the rendered story's height once it has content. */
-const measureHeight = (
+/**
+ * Fits the story to the box once it has content (see preview-fit.ts),
+ * and calls back with the height that shows it when one is wanted.
+ */
+const fitContent = (
   doc: Document,
-  onMeasure: (height: number) => void,
+  onMeasure: ((height: number) => void) | undefined,
 ): void => {
   const root = doc.getElementById("storybook-root");
   if (!root) {
     return;
   }
-  const measure = (): boolean => {
-    const bottoms = Array.from(root.children).map(
-      (child) => child.getBoundingClientRect().bottom,
-    );
-    const height = Math.ceil(Math.max(0, ...bottoms));
-    if (height > 0) {
-      onMeasure(height);
-      return true;
+  const fit = (): boolean => {
+    const height = fitRoot(doc, root);
+    if (height === undefined) {
+      return false;
     }
-    return false;
+    onMeasure?.(height);
+    return true;
   };
-  if (measure()) {
+  if (fit()) {
     return;
   }
   const observer = new MutationObserver(() => {
     requestAnimationFrame(() => {
-      if (measure()) {
+      if (fit()) {
         observer.disconnect();
       }
     });
@@ -161,13 +162,15 @@ export const BoardComponent = ({
     }
     fitPreview(doc);
     void loadStoryArgTypes(doc.defaultView, component.storyId, component.refId);
-    if (pendingAutoSize.delete(component.id)) {
-      measureHeight(doc, (height) =>
-        updateActiveBoard((board) =>
-          updateComponent(board, component.id, { height }),
-        ),
-      );
-    }
+    fitContent(
+      doc,
+      pendingAutoSize.delete(component.id)
+        ? (height) =>
+            updateActiveBoard((board) =>
+              updateComponent(board, component.id, { height }),
+            )
+        : undefined,
+    );
   };
 
   return (
