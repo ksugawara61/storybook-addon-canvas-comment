@@ -5,7 +5,7 @@ description: Turn the open Storybook canvas comments left with storybook-addon-c
 
 # canvas-issues
 
-Read the `open` comments saved by [storybook-addon-canvas-comments](https://github.com/ksugawara61/storybook-addon-canvas-comment).
+Read the `open` comments saved by [storybook-addon-canvas-comments](https://github.com/ksugawara61/storybook-addon-canvas-comments).
 Group them by feature, find the component each one points at, and file one GitHub issue per group.
 
 ## Args

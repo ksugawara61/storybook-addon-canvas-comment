@@ -619,8 +619,8 @@ It needs the [GitHub CLI](https://cli.github.com/) (`gh`), signed in to the repo
 Install it in Claude Code:
 
 ```text
-/plugin marketplace add ksugawara61/storybook-addon-canvas-comment
-/plugin install canvas-comments@storybook-addon-canvas-comment
+/plugin marketplace add ksugawara61/storybook-addon-canvas-comments
+/plugin install canvas-comments@storybook-addon-canvas-comments
 ```
 
 To turn it on for everyone working in a project, add it to the project's `.claude/settings.json`:
@@ -628,15 +628,15 @@ To turn it on for everyone working in a project, add it to the project's `.claud
 ```json
 {
   "extraKnownMarketplaces": {
-    "storybook-addon-canvas-comment": {
+    "storybook-addon-canvas-comments": {
       "source": {
         "source": "github",
-        "repo": "ksugawara61/storybook-addon-canvas-comment"
+        "repo": "ksugawara61/storybook-addon-canvas-comments"
       }
     }
   },
   "enabledPlugins": {
-    "canvas-comments@storybook-addon-canvas-comment": true
+    "canvas-comments@storybook-addon-canvas-comments": true
   }
 }
 ```
@@ -704,7 +704,7 @@ The Release workflow runs the same checks before publishing.
   For the first release, publish a placeholder once, for example with `npx setup-npm-trusted-publish storybook-addon-canvas-comments`.
 - **npm:** under the package's **Settings → Trusted Publisher**, choose GitHub Actions and enter:
   - Organization or user: `ksugawara61`
-  - Repository: `storybook-addon-canvas-comment`
+  - Repository: `storybook-addon-canvas-comments`
   - Workflow filename: `release.yaml`
   - Environment name: `npm`
   - Allowed actions: leave both "Allow npm publish" and "Allow npm dist-tag" unchecked, so CI can only stage new versions.
@@ -714,4 +714,4 @@ If publishing fails with `422 Unprocessable Entity`, check the Trusted Publisher
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/ksugawara61/storybook-addon-canvas-comment.
+Bug reports and pull requests are welcome on GitHub at https://github.com/ksugawara61/storybook-addon-canvas-comments.
