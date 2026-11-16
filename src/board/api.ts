@@ -1,6 +1,8 @@
 import fs from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { parseReviewState, readReviewStatus } from "../review-schema.ts";
+import type { ReviewState, ReviewStatus } from "../types.ts";
 import {
   type BoardFile,
   createEmptyBoardFile,
@@ -20,6 +22,12 @@ export const createBoardPaths = (cwd: string = process.cwd()): BoardPaths => ({
   instructions: resolve(cwd, INSTRUCTIONS_FILE_RELATIVE_PATH),
 });
 
+/** Paths for a given board.json. The instructions Markdown sits next to it. */
+export const boardPathsFromFile = (boardFile: string): BoardPaths => {
+  const board = resolve(boardFile);
+  return { board, instructions: join(dirname(board), "board-instructions.md") };
+};
+
 const json = (res: ServerResponse, status: number, body: unknown): void => {
   res.statusCode = status;
   res.setHeader("content-type", "application/json");
@@ -35,25 +43,59 @@ const readBody = async (req: IncomingMessage): Promise<unknown> => {
   return raw ? (JSON.parse(raw) as unknown) : undefined;
 };
 
-export const readBoardFile = async (path: string): Promise<BoardFile> => {
+const readRaw = async (path: string): Promise<unknown> => {
   try {
-    return parseBoardFile(JSON.parse(await fs.readFile(path, "utf8")));
+    return JSON.parse(await fs.readFile(path, "utf8")) as unknown;
   } catch {
-    return createEmptyBoardFile();
+    return undefined;
   }
 };
 
-/** Writes board.json and a Markdown copy of the instructions that agents can read as-is. */
-export const writeBoardFile = async (
+const readRawReview = (raw: unknown): unknown =>
+  typeof raw === "object" && raw !== null && "review" in raw
+    ? raw.review
+    : undefined;
+
+export const readBoardFile = async (path: string): Promise<BoardFile> => {
+  const raw = await readRaw(path);
+  return raw === undefined ? createEmptyBoardFile() : parseBoardFile(raw);
+};
+
+/** Reads the review status that board.json keeps next to the boards. */
+export const readBoardReview = async (path: string): Promise<ReviewState> =>
+  parseReviewState(readRawReview(await readRaw(path)));
+
+const writeFiles = async (
   paths: BoardPaths,
   file: BoardFile,
+  review: ReviewState,
 ): Promise<void> => {
   await fs.mkdir(dirname(paths.board), { recursive: true });
   await fs.mkdir(dirname(paths.instructions), { recursive: true });
   await Promise.all([
-    fs.writeFile(paths.board, serializeBoardFile(file)),
+    fs.writeFile(paths.board, serializeBoardFile(file, review)),
     fs.writeFile(paths.instructions, toInstructionsMarkdown(file.boards)),
   ]);
+};
+
+/**
+ * Writes board.json and a Markdown copy of the instructions that agents can read as-is.
+ * The stored review status is kept, since the board page does not send it.
+ */
+export const writeBoardFile = async (
+  paths: BoardPaths,
+  file: BoardFile,
+): Promise<void> => {
+  await writeFiles(paths, file, await readBoardReview(paths.board));
+};
+
+export const writeBoardReview = async (
+  paths: BoardPaths,
+  status: ReviewStatus,
+): Promise<ReviewState> => {
+  const review: ReviewState = { status, updatedAt: new Date().toISOString() };
+  await writeFiles(paths, await readBoardFile(paths.board), review);
+  return review;
 };
 
 /** Handles `GET` / `PUT /__canvas-comments/board` on the dev server. */
@@ -71,6 +113,32 @@ export const handleBoardRequest = async (
       const file = parseBoardFile(await readBody(req));
       await writeBoardFile(paths, file);
       json(res, 200, file);
+      return;
+    }
+    default: {
+      json(res, 405, { error: "Method not allowed" });
+    }
+  }
+};
+
+/** Handles `GET` / `POST /__canvas-comments/board/review` on the dev server. */
+export const handleBoardReviewRequest = async (
+  req: IncomingMessage,
+  res: ServerResponse,
+  paths: BoardPaths,
+): Promise<void> => {
+  switch (req.method) {
+    case "GET": {
+      json(res, 200, await readBoardReview(paths.board));
+      return;
+    }
+    case "POST": {
+      const status = readReviewStatus(await readBody(req));
+      if (!status) {
+        json(res, 400, { error: "Invalid review status payload" });
+        return;
+      }
+      json(res, 200, await writeBoardReview(paths, status));
       return;
     }
     default: {

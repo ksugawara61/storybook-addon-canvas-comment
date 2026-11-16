@@ -1,8 +1,10 @@
 {
   "author": "ksugawara61",
   "bin": {
+    "canvas-comments-board-resolve": "./dist/cli/board-resolve.js",
     "canvas-comments-dom-map": "./dist/cli/dom-map.js",
     "canvas-comments-reply": "./dist/cli/reply.js",
+    "canvas-comments-wait-board": "./dist/cli/wait-board.js",
     "canvas-comments-wait-comments": "./dist/cli/wait-comments.js"
   },
   "bugs": {
@@ -83,11 +85,13 @@
     "url": "git+https://github.com/ksugawara61/storybook-addon-canvas-comments.git"
   },
   "scripts": {
+    "board-resolve": "tsx src/cli/board-resolve.ts",
     "build": "tsup",
     "dom-map": "tsx src/cli/dom-map.ts",
     "reply": "tsx src/cli/reply.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit && tsc --noEmit -p src/cloudflare/tsconfig.json",
+    "wait-board": "tsx src/cli/wait-board.ts",
     "wait-comments": "tsx src/cli/wait-comments.ts",
     "prepack": "tsup"
   },

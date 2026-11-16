@@ -1,12 +1,12 @@
 {
   "name": "canvas-comments",
-  "version": "0.1.0",
-  "description": "Turn open Storybook canvas comments into GitHub issues, grouped by feature.",
+  "version": "0.2.0",
+  "description": "Turn open Storybook canvas comments into GitHub issues, and apply the Storybook board's fix instructions when the user sends them.",
   "author": {
     "name": "ksugawara61"
   },
   "homepage": "https://github.com/ksugawara61/storybook-addon-canvas-comments#claude-code-plugin",
   "repository": "https://github.com/ksugawara61/storybook-addon-canvas-comments",
   "license": "MIT",
-  "keywords": ["storybook", "canvas-comments", "design-review", "github-issues"]
+  "keywords": ["storybook", "canvas-comments", "design-review", "github-issues", "board"]
 }

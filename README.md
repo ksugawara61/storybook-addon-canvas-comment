@@ -40,7 +40,7 @@ The [Board](#board) section has a demo of the board page.
 | Replies | Each comment has a reply thread. Reviewers reply from the panel. Coding agents reply with the `reply` CLI to explain what they changed. The thread is shown in the panel and in the pin tooltip. |
 | Review-completion signal | A "Complete review" button in the panel flips a review status flag. A waiting coding agent can detect it. "Reopen review" flips it back. |
 | Agent-friendly output | The `dom-map` and `wait-comments` CLIs pair each comment with its saved DOM snapshot. They emit JSON built for LLM consumption. |
-| Board | A board page (`/?path=/board/`) lays stories out as frames to compare variants. Drag elements in a frame to leave move instructions, mark them for removal, comment on them, and put notes on the board. Drag components from a design system onto a frame to show what to add. The instructions are written as Markdown for coding agents. See [Board](#board). |
+| Board | A board page (`/?path=/board/`) lays stories out as frames to compare variants. Drag elements in a frame to leave move instructions, mark them for removal, comment on them, and put notes on the board. Drag components from a design system onto a frame to show what to add. The instructions are written as Markdown for coding agents. **Send to agent** signals a coding agent waiting with the `wait-board` CLI, which applies them and clears them from the board. See [Board](#board). |
 
 ## Requirements
 
@@ -340,6 +340,60 @@ A statically built Storybook has no dev-server API.
 There the board saves to the browser's `localStorage`, so only that browser sees it.
 Use **Copy as Markdown** to hand the instructions over.
 
+### Sending the board to a coding agent
+
+A coding agent can wait for the board, apply its instructions, and hand it back, round after round:
+
+1. The agent runs `canvas-comments-wait-board` and waits.
+2. You collect instructions on the board, then click **Send to agent** in the **Agent** section of the side panel.
+   Pending edits are saved first, and the status turns to **Sent to agent**.
+3. The CLI prints the instructions and exits. The agent changes the code.
+4. The agent clears the instructions it applied with `canvas-comments-board-resolve`.
+   The board page picks the change up within a few seconds, and the frames reload with the fixes.
+5. The agent runs `canvas-comments-wait-board` again, which sets the status back to **Editing**.
+
+**Reopen** takes the board back before an agent picks it up.
+The **Agent** section is shown only with the dev server, because a static build has no API to signal through.
+The [`board-fix` skill](#claude-code-plugin) runs this loop in Claude Code.
+
+The status is stored in `board.json` under `review`, in the same shape as the comments' review status:
+
+```json
+{
+  "boards": [],
+  "version": 1,
+  "review": {
+    "status": "completed",
+    "updatedAt": "2026-11-16T00:00:00.000Z"
+  }
+}
+```
+
+`wait-board` resets the status to `reviewing` and polls `board.json` until it is `completed`.
+It then prints the instructions Markdown, the same as `board-instructions.md`:
+
+```bash
+pnpm exec canvas-comments-wait-board \
+  --board-file path/to/.storybook/canvas-comments/board.json
+```
+
+- `--format json` — print `{ boardFile, instructions, items }` instead.
+  `items` lists each edit, component and note with its `id`, `kind` and board, for `board-resolve`.
+- `--timeout-ms <ms>` — give up after this long, with exit code `2`. `0` waits indefinitely (default).
+- `--poll-interval-ms <ms>` — polling interval (default `2000`).
+- `--no-reset` — do not reset the status first, e.g. when waiting again after a timeout.
+
+`board-resolve` removes applied instructions — element edits, components to add, and notes — and keeps the frames.
+It prints the removed items as JSON:
+
+```bash
+pnpm exec canvas-comments-board-resolve --ids 3f2a...,9c1d...
+```
+
+- `--ids <id,id,...>` — the items to remove, from `wait-board --format json`. Instructions added since stay on the board.
+- `--all` — remove every instruction on every board.
+- `--board-file <path>` — override the default path.
+
 The board reads each frame's DOM directly, so the manager and the preview must be served from the same origin.
 That is the default for `storybook dev` and `storybook build`.
 Every frame is a separate iframe, so keep a board to the stories you want to compare.
@@ -435,6 +489,8 @@ GET    /__canvas-comments/review
 POST   /__canvas-comments/review
 GET    /__canvas-comments/board
 PUT    /__canvas-comments/board
+GET    /__canvas-comments/board/review
+POST   /__canvas-comments/board/review
 ```
 
 `PATCH` updates a comment's `status` to `open` or `resolved`:
@@ -477,6 +533,10 @@ An `agent` reply leaves the review status alone.
 
 `GET /__canvas-comments/board` returns the saved boards as `{ "version": 1, "boards": [...] }`.
 `PUT` replaces them, writes `board.json`, and rewrites `board-instructions.md`.
+It keeps the board's review status.
+
+`GET /__canvas-comments/board/review` returns the board's review state.
+`POST` sets `status` to `reviewing` or `completed`, with the same body as `/__canvas-comments/review`.
 
 Requests from the addon are sent with `Accept: msw/passthrough`.
 So stories using `msw-storybook-addon` do not log unhandled-request warnings.
@@ -659,10 +719,13 @@ CF_ACCESS_CLIENT_ID=<client id> CF_ACCESS_CLIENT_SECRET=<client secret> \
 ## Claude Code plugin
 
 This repository is also a [Claude Code plugin marketplace](https://code.claude.com/docs/en/plugin-marketplaces).
-The `canvas-comments` plugin ships the `canvas-issues` skill.
-The skill reads the open comments with the `dom-map` CLI and finds the component each one points at.
-It then files one GitHub issue per feature, labeled `design`.
-It needs the [GitHub CLI](https://cli.github.com/) (`gh`), signed in to the repository.
+The `canvas-comments` plugin ships two skills:
+
+- `canvas-issues` reads the open comments with the `dom-map` CLI and finds the component each one points at.
+  It then files one GitHub issue per feature, labeled `design`.
+  It needs the [GitHub CLI](https://cli.github.com/) (`gh`), signed in to the repository.
+- `board-fix` waits for **Send to agent** on the [board](#sending-the-board-to-a-coding-agent) with the `wait-board` CLI.
+  It applies the instructions to the code, clears them with `board-resolve`, and waits for the next round.
 
 Install it in Claude Code:
 
@@ -697,6 +760,11 @@ The skill works without any setup in a project with one Storybook.
 For anything project-specific, add `.claude/canvas-issues.md` at the repository root.
 Examples are where each app's Storybook lives, the hosted API URL, where shared UI primitives are, and the issue template.
 The skill reads that file first and follows it.
+
+To have Claude fix what you send from the board, start Storybook and ask Claude to "watch the board and fix it", or run `/canvas-comments:board-fix`.
+Claude waits in the background; click **Send to agent** on the board whenever a round of instructions is ready.
+Pass `once` to stop after one round.
+For project-specific steps, such as which checks to run after a fix, add `.claude/board-fix.md` at the repository root.
 
 ## Development
 

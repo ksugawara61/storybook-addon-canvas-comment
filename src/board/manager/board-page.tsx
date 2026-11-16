@@ -14,6 +14,7 @@ import {
 } from "react";
 import { useTheme } from "storybook/theming";
 import type { Board, BoardFrame } from "../board-schema.ts";
+import { listInstructionItems } from "../board-items.ts";
 import { addComponent } from "../board-state.ts";
 import {
   BOARD_FILE_RELATIVE_PATH,
@@ -457,8 +458,10 @@ export const BoardPage = () => {
         </div>
         <SidePanel
           board={board}
+          instructionCount={listInstructionItems(store.file.boards).length}
           onSelectFrame={setSelectedFrameId}
           onSelectItem={setSelectedItemId}
+          review={store.status === "file" ? store.review : undefined}
           selectedFrameId={selectedFrameId}
           selectedItemId={selectedItemId}
           storageLabel={STORAGE_LABELS[store.status]}

@@ -5,9 +5,11 @@ import {
   type BoardPaths,
   createBoardPaths,
   handleBoardRequest,
+  handleBoardReviewRequest,
 } from "./board/api.ts";
 import {
   BOARD_API_PATH,
+  BOARD_REVIEW_API_PATH,
   DESIGN_SYSTEMS_ENV_KEY,
 } from "./board/constants.ts";
 import {
@@ -312,6 +314,11 @@ const handleRequest = async (
 ) => {
   if (pathname === BOARD_API_PATH) {
     await handleBoardRequest(req, res, boardPaths);
+    return;
+  }
+
+  if (pathname === BOARD_REVIEW_API_PATH) {
+    await handleBoardReviewRequest(req, res, boardPaths);
     return;
   }
 

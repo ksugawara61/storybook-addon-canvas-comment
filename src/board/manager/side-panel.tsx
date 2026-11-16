@@ -25,6 +25,8 @@ import {
   REMOVE_ACCENT,
 } from "../constants.ts";
 import { toInstructionsMarkdown } from "../instructions.ts";
+import type { ReviewState } from "../../types.ts";
+import { AgentHandoff } from "./agent-handoff.tsx";
 import { ArgsEditor } from "./args-editor.tsx";
 import { updateActiveBoard } from "./store.ts";
 import { buttonStyle, inputStyle } from "./styles.ts";
@@ -37,9 +39,13 @@ const SIZE_PRESETS = [
 
 type Props = {
   board: Board | undefined;
+  /** Instructions across every board, which "Send to agent" hands over. */
+  instructionCount: number;
   onSelectFrame: (frameId: string | undefined) => void;
   /** Selects an element instruction or a placed component. */
   onSelectItem: (itemId: string | undefined) => void;
+  /** Undefined without the dev-server API, where no agent can be waiting. */
+  review: ReviewState | undefined;
   selectedFrameId: string | undefined;
   selectedItemId: string | undefined;
   storageLabel: string;
@@ -47,8 +53,10 @@ type Props = {
 
 export const SidePanel = ({
   board,
+  instructionCount,
   onSelectFrame,
   onSelectItem,
+  review,
   selectedFrameId,
   selectedItemId,
   storageLabel,
@@ -163,6 +171,9 @@ export const SidePanel = ({
           </p>
         )}
       </Section>
+      {review ? (
+        <AgentHandoff instructionCount={instructionCount} review={review} />
+      ) : null}
       <p
         style={{
           color: theme.textMutedColor,

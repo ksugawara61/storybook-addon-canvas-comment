@@ -10,9 +10,9 @@
     {
       "name": "canvas-comments",
       "source": "./plugins/canvas-comments",
-      "description": "Turn open Storybook canvas comments into GitHub issues, grouped by feature.",
+      "description": "Turn open Storybook canvas comments into GitHub issues, and apply the Storybook board's fix instructions when the user sends them.",
       "category": "development",
-      "keywords": ["storybook", "canvas-comments", "design-review", "github-issues"]
+      "keywords": ["storybook", "canvas-comments", "design-review", "github-issues", "board"]
     }
   ]
 }

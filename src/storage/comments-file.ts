@@ -1,5 +1,8 @@
 import { isCanvasComment } from "../comment-schema.ts";
-import { readReviewStatus } from "../review-schema.ts";
+import {
+  createInitialReviewState,
+  parseReviewState,
+} from "../review-schema.ts";
 import type { CanvasComment, ReviewState } from "../types.ts";
 
 /**
@@ -13,7 +16,7 @@ export type CommentsFile = {
 
 export const createEmptyCommentsFile = (): CommentsFile => ({
   comments: [],
-  review: { status: "reviewing", updatedAt: null },
+  review: createInitialReviewState(),
 });
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -21,19 +24,6 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const parseComments = (value: unknown): CanvasComment[] =>
   Array.isArray(value) ? value.filter(isCanvasComment) : [];
-
-const parseReview = (value: unknown): ReviewState => {
-  const status = readReviewStatus(value);
-
-  if (!status || !isRecord(value)) {
-    return createEmptyCommentsFile().review;
-  }
-
-  return {
-    status,
-    updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : null,
-  };
-};
 
 /**
  * Reads an already JSON-parsed value. The legacy format, a bare comment array,
@@ -50,7 +40,7 @@ export const parseCommentsFile = (raw: unknown): CommentsFile => {
 
   return {
     comments: parseComments(raw.comments),
-    review: parseReview(raw.review),
+    review: parseReviewState(raw.review),
   };
 };
 
