@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.3.4
+
 - Put the components of a library without stories on the board.
   Set `components` on a design system: `"auto"` lists the components the module exports (read with TypeScript), and an array names them.
   The preset writes a story for each component, hidden from the sidebar with the `canvas-comments-library` tag, and the board renders it in this Storybook like any other component.
