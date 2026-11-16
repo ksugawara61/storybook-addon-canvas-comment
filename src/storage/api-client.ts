@@ -7,13 +7,13 @@ import type {
   ReviewStatus,
 } from "../types.ts";
 
-type AccessEnv = Record<string, string | undefined>;
+export type AccessEnv = Record<string, string | undefined>;
 
 /**
  * Cloudflare Access service token headers, taken from `CF_ACCESS_CLIENT_ID` and
  * `CF_ACCESS_CLIENT_SECRET`. Empty when neither is set.
  */
-const accessHeadersFromEnv = (
+export const accessHeadersFromEnv = (
   env: AccessEnv = process.env,
 ): Record<string, string> => {
   const id = env.CF_ACCESS_CLIENT_ID ?? "";

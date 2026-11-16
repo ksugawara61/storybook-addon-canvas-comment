@@ -11,12 +11,15 @@ import { parseReviewState } from "../../review-schema.ts";
 import type { ReviewState, ReviewStatus } from "../../types.ts";
 import {
   ACTIVE_BOARD_STORAGE_KEY,
-  BOARD_API_PATH,
-  BOARD_REVIEW_API_PATH,
+  getBoardApiPath,
+  getBoardReviewApiPath,
   LOCAL_STORAGE_KEY,
 } from "../constants.ts";
 
-/** file: saved through the dev-server API / local: no API (static build), saved to localStorage */
+/**
+ * file: saved through the dev-server API, or the hosted API when the preset sets `apiUrl`
+ * local: no API (a static build without `apiUrl`), saved to localStorage
+ */
 type StorageStatus = "file" | "loading" | "local";
 
 type StoreState = {
@@ -96,12 +99,12 @@ const fetchJson = async (url: string): Promise<unknown> => {
 };
 
 const fetchFile = async (): Promise<BoardFile | undefined> => {
-  const raw = await fetchJson(BOARD_API_PATH);
+  const raw = await fetchJson(getBoardApiPath());
   return raw === undefined ? undefined : parseBoardFile(raw);
 };
 
 const fetchReview = async (): Promise<ReviewState | undefined> => {
-  const raw = await fetchJson(BOARD_REVIEW_API_PATH);
+  const raw = await fetchJson(getBoardReviewApiPath());
   return raw === undefined ? undefined : parseReviewState(raw);
 };
 
@@ -178,7 +181,7 @@ const persistNow = async (): Promise<void> => {
   const body = JSON.stringify(file);
   if (state.status === "file") {
     try {
-      const response = await fetch(BOARD_API_PATH, {
+      const response = await fetch(getBoardApiPath(), {
         body,
         headers: { ...API_HEADERS, "content-type": "application/json" },
         method: "PUT",
@@ -292,7 +295,7 @@ export const setBoardReview = async (status: ReviewStatus): Promise<void> => {
     return;
   }
   writeGeneration += 1;
-  const response = await fetch(BOARD_REVIEW_API_PATH, {
+  const response = await fetch(getBoardReviewApiPath(), {
     body: JSON.stringify({ status }),
     headers: { ...API_HEADERS, "content-type": "application/json" },
     method: "POST",

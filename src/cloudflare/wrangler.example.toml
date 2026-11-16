@@ -2,11 +2,16 @@ name = "your-storybook"
 compatibility_date = "2024-01-01"
 pages_build_output_dir = "storybook-static"
 
-# Comments and review state live in one R2 object per app: <app>/comments.json.
+# Each app keeps two R2 objects in this bucket:
+#   <app>/comments.json  comments and their review state
+#   <app>/board.json     the board and its "Send to agent" state
 # Create the bucket first: wrangler r2 bucket create your-canvas-comments
+# This top-level binding applies to preview (branch) deployments too, so pull
+# request previews share the bucket. Put the branch in <app> to keep them apart.
 [[r2_buckets]]
 binding = "CANVAS_COMMENTS_BUCKET"
 bucket_name = "your-canvas-comments"
 
 # The API has no authentication of its own. Put the Pages project behind
 # Cloudflare Access so only reviewers can read and write /api/canvas-comments/*.
+# Give coding agents a service token (CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET).

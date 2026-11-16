@@ -9,7 +9,11 @@ import {
   writeBoardReview,
 } from "./api.ts";
 import type { BoardFile } from "./board-schema.ts";
-import { BoardWaitTimeoutError, waitForBoard } from "./board-watch.ts";
+import {
+  BoardWaitTimeoutError,
+  fsBoardSource,
+  waitForBoard,
+} from "./board-watch.ts";
 
 const boardFile: BoardFile = {
   boards: [
@@ -62,7 +66,7 @@ describe("waitForBoard", () => {
     const paths = await setup();
     await writeBoardReview(paths, "completed");
 
-    const waiting = waitForBoard(paths, {
+    const waiting = waitForBoard(fsBoardSource(paths), {
       onWaiting: () => {
         void writeBoardReview(paths, "completed");
       },
@@ -84,7 +88,7 @@ describe("waitForBoard", () => {
     const paths = await setup();
     await writeBoardReview(paths, "completed");
 
-    const handoff = await waitForBoard(paths, {
+    const handoff = await waitForBoard(fsBoardSource(paths), {
       pollIntervalMs: 5,
       reset: false,
       timeoutMs: 0,
@@ -97,8 +101,46 @@ describe("waitForBoard", () => {
     const paths = await setup();
 
     await expect(
-      waitForBoard(paths, { pollIntervalMs: 5, reset: true, timeoutMs: 20 }),
+      waitForBoard(fsBoardSource(paths), { pollIntervalMs: 5, reset: true, timeoutMs: 20 }),
     ).rejects.toBeInstanceOf(BoardWaitTimeoutError);
     expect((await readBoardReview(paths.board)).status).toBe("reviewing");
+  });
+
+  it("keeps waiting through a few failed polls of a hosted API", async () => {
+    const paths = await setup();
+    const fs = fsBoardSource(paths);
+    let polls = 0;
+    const flaky = {
+      ...fs,
+      readReview: async () => {
+        polls += 1;
+        if (polls <= 2) {
+          throw new Error("fetch failed");
+        }
+        return { status: "completed" as const, updatedAt: null };
+      },
+    };
+
+    const handoff = await waitForBoard(flaky, {
+      pollIntervalMs: 1,
+      reset: false,
+      timeoutMs: 0,
+    });
+
+    expect(handoff.items).toHaveLength(1);
+  });
+
+  it("gives up when the polls keep failing", async () => {
+    const paths = await setup();
+    const failing = {
+      ...fsBoardSource(paths),
+      readReview: async () => {
+        throw new Error("fetch failed");
+      },
+    };
+
+    await expect(
+      waitForBoard(failing, { pollIntervalMs: 1, reset: false, timeoutMs: 0 }),
+    ).rejects.toThrow("fetch failed");
   });
 });

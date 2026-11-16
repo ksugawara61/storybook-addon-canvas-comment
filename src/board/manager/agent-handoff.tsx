@@ -7,6 +7,7 @@ import React from "react";
 import { useState } from "react";
 import { useTheme } from "storybook/theming";
 import type { ReviewState, ReviewStatus } from "../../types.ts";
+import { BOARD_API_PATH, getBoardApiPath } from "../constants.ts";
 import { setBoardReview } from "./store.ts";
 import { buttonStyle } from "./styles.ts";
 
@@ -101,7 +102,11 @@ export const AgentHandoff = ({
       </div>
       <p style={{ color: theme.textMutedColor, margin: 0 }}>
         {sent
-          ? "A waiting agent applies the instructions to the code and clears them from the board. The frames reload with the fixes."
+          ? `A waiting agent applies the instructions to the code and clears them from the board. ${
+              getBoardApiPath() === BOARD_API_PATH
+                ? "The frames reload with the fixes."
+                : "Reload this page once the fixes are deployed to see them in the frames."
+            }`
           : "Send the instructions on every board to a coding agent waiting with canvas-comments-wait-board."}
       </p>
       {error ? (

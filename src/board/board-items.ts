@@ -66,3 +66,29 @@ export const resolveInstructionItems = (
     resolved,
   };
 };
+
+/** What to resolve: `ids` lists the items, and is left out to resolve every instruction. */
+export type ResolveRequest = { ids?: ReadonlySet<string> };
+
+/**
+ * Reads the body of `POST .../board/resolve`: `{ "ids": ["..."] }` or `{ "all": true }`.
+ * Undefined when it is neither, so a malformed body never clears the whole board.
+ */
+export const readResolveRequest = (value: unknown): ResolveRequest | undefined => {
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
+  const { all, ids } = value as { all?: unknown; ids?: unknown };
+  if (all === true && ids === undefined) {
+    return {};
+  }
+  if (
+    all === undefined &&
+    Array.isArray(ids) &&
+    ids.length > 0 &&
+    ids.every((id) => typeof id === "string" && id !== "")
+  ) {
+    return { ids: new Set(ids as string[]) };
+  }
+  return undefined;
+};

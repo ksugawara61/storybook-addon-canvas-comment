@@ -7,6 +7,11 @@
   The `canvas-comments-wait-board` CLI blocks until then and prints the instructions, and `canvas-comments-board-resolve` clears the instructions the agent applied.
   An open board page now picks up changes to `board.json` made outside it, so the cleared instructions disappear and the frames show the fixes.
 - Add the `board-fix` skill to the Claude Code plugin. It waits for the board, applies the instructions, clears them, and waits again.
+- Store the board in R2 in hosted mode (Cloudflare Pages + R2), in the same bucket as the comments.
+  With the preset option `apiUrl`, a static build saves the board to `<app>/board.json` through new Pages Functions (`/api/canvas-comments/<app>/board`, `/board/review` and `/board/resolve`) instead of the browser's `localStorage`, and shows **Send to agent**.
+  `canvas-comments-wait-board` and `canvas-comments-board-resolve` take `--api-url`, the same comments URL as the other CLIs, and send the Cloudflare Access service token when it is set.
+  The package now ships `src/board/board-items.ts` and `src/board/board-schema.ts`, which the Functions import.
+- Add the `board-fix-remote` skill to the Claude Code plugin. It runs the board loop against a pull request's preview Storybook through the hosted API, and pushes each round's fixes to the PR branch.
 
 ## 0.3.5
 

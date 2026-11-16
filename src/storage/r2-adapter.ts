@@ -11,45 +11,34 @@ import {
   parseCommentsFile,
   serializeCommentsFile,
 } from "./comments-file.ts";
+import { type R2BucketLike, R2JsonObject } from "./r2-object.ts";
 import type { StorageAdapter } from "./types.ts";
 
-/** The subset of Cloudflare's `R2Bucket` this adapter uses, so Node code can type it too. */
-export type R2BucketLike = {
-  get(key: string): Promise<{ etag: string; text(): Promise<string> } | null>;
-  /** Resolves to null when the `onlyIf` precondition fails. */
-  put(
-    key: string,
-    value: string,
-    options?: {
-      httpMetadata?: { contentType?: string };
-      onlyIf?: { etagDoesNotMatch?: string; etagMatches?: string };
-    },
-  ): Promise<unknown>;
+export type { R2BucketLike } from "./r2-object.ts";
+
+const COMMENTS_CODEC = {
+  empty: createEmptyCommentsFile,
+  parse: parseCommentsFile,
+  serialize: serializeCommentsFile,
 };
 
-const MAX_ATTEMPTS = 8;
-
-type Change<T> = { next: CommentsFile | null; result: T };
-
 /**
- * Stores everything in one R2 object. Every write is conditional on the etag it
- * read, so a concurrent writer makes it re-read and retry instead of losing data.
+ * Stores comments and the review status in one R2 object (`<app>/comments.json`).
+ * Writes are conditional on its etag, see `R2JsonObject`.
  */
 export class R2Adapter implements StorageAdapter {
-  readonly #bucket: R2BucketLike;
-  readonly #key: string;
+  readonly #object: R2JsonObject<CommentsFile>;
 
   constructor(bucket: R2BucketLike, key: string) {
-    this.#bucket = bucket;
-    this.#key = key;
+    this.#object = new R2JsonObject(bucket, key, COMMENTS_CODEC);
   }
 
   async list(): Promise<CanvasComment[]> {
-    return (await this.#load()).file.comments;
+    return (await this.#object.read()).comments;
   }
 
   async create(comment: CanvasComment): Promise<CanvasComment> {
-    return this.#mutate((file) => ({
+    return this.#object.mutate((file) => ({
       next: { ...file, comments: [comment, ...file.comments] },
       result: comment,
     }));
@@ -59,7 +48,7 @@ export class R2Adapter implements StorageAdapter {
     id: string,
     status: CanvasCommentStatus,
   ): Promise<CanvasComment | null> {
-    return this.#mutate((file) => {
+    return this.#object.mutate((file) => {
       const comments = file.comments.map((c) =>
         c.id === id ? { ...c, status } : c,
       );
@@ -72,7 +61,7 @@ export class R2Adapter implements StorageAdapter {
     id: string,
     reply: CanvasCommentReply,
   ): Promise<CanvasComment | null> {
-    return this.#mutate((file) => {
+    return this.#object.mutate((file) => {
       const comments = file.comments.map((c) =>
         c.id === id ? { ...c, replies: [...(c.replies ?? []), reply] } : c,
       );
@@ -82,7 +71,7 @@ export class R2Adapter implements StorageAdapter {
   }
 
   async remove(id: string): Promise<CanvasComment | null> {
-    return this.#mutate((file) => {
+    return this.#object.mutate((file) => {
       const deleted = file.comments.find((c) => c.id === id) ?? null;
       return {
         next: deleted
@@ -94,7 +83,7 @@ export class R2Adapter implements StorageAdapter {
   }
 
   async removeResolved(): Promise<CanvasComment[]> {
-    return this.#mutate((file) => {
+    return this.#object.mutate((file) => {
       const deleted = file.comments.filter((c) => c.status === "resolved");
       return {
         next:
@@ -110,56 +99,14 @@ export class R2Adapter implements StorageAdapter {
   }
 
   async readReviewState(): Promise<ReviewState> {
-    return (await this.#load()).file.review;
+    return (await this.#object.read()).review;
   }
 
   async writeReviewState(status: ReviewStatus): Promise<ReviewState> {
     const review: ReviewState = { status, updatedAt: new Date().toISOString() };
-    return this.#mutate((file) => ({
+    return this.#object.mutate((file) => ({
       next: { ...file, review },
       result: review,
     }));
-  }
-
-  async #load(): Promise<{ etag: string | null; file: CommentsFile }> {
-    const object = await this.#bucket.get(this.#key);
-
-    if (!object) {
-      return { etag: null, file: createEmptyCommentsFile() };
-    }
-
-    return {
-      etag: object.etag,
-      file: parseCommentsFile(JSON.parse(await object.text())),
-    };
-  }
-
-  async #mutate<T>(change: (file: CommentsFile) => Change<T>): Promise<T> {
-    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
-      const { etag, file } = await this.#load();
-      const { next, result } = change(file);
-
-      if (!next) {
-        return result;
-      }
-
-      const stored = await this.#bucket.put(
-        this.#key,
-        serializeCommentsFile(next),
-        {
-          httpMetadata: { contentType: "application/json" },
-          // A missing object may only be created if nobody created it meanwhile.
-          onlyIf: etag ? { etagMatches: etag } : { etagDoesNotMatch: "*" },
-        },
-      );
-
-      if (stored) {
-        return result;
-      }
-    }
-
-    throw new Error(
-      `Could not save ${this.#key}: it kept changing during ${MAX_ATTEMPTS} attempts.`,
-    );
   }
 }

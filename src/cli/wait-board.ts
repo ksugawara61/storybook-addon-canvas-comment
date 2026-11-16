@@ -1,5 +1,5 @@
-import { boardPathsFromFile, createBoardPaths } from "../board/api.ts";
 import { BoardWaitTimeoutError, waitForBoard } from "../board/board-watch.ts";
+import { BOARD_SOURCE_HELP, openBoardSource } from "./board-source.ts";
 import { CliError, parseInteger, parseOptions, runCli } from "./options.ts";
 
 const HELP = `Usage:
@@ -11,13 +11,12 @@ waits for the board, applies the instructions to the code, clears them with
 canvas-comments-board-resolve, and waits again.
 
 Options:
-  --board-file <path>         Path to board.json, which holds the review status
-                              too. Defaults to .storybook/canvas-comments/board.json
-                              relative to the current working directory.
+${BOARD_SOURCE_HELP}
   --format <markdown|json>    markdown (default) prints the instructions as in
                               board-instructions.md. json prints
                               { boardFile, instructions, items }, where items
                               lists the ids to pass to canvas-comments-board-resolve.
+                              boardFile is the board.json path or the board API URL.
   --poll-interval-ms <ms>     Poll interval while waiting. Defaults to 2000.
   --timeout-ms <ms>           Give up after this long (exit 2). Defaults to 0
                               (wait indefinitely).
@@ -35,6 +34,7 @@ Exit codes:
 type Format = "json" | "markdown";
 
 type Options = {
+  apiUrl?: string;
   boardFile?: string;
   format: Format;
   pollIntervalMs: number;
@@ -60,6 +60,9 @@ const main = async () => {
         },
       },
       values: {
+        "--api-url": (current, value) => {
+          current.apiUrl = value;
+        },
         "--board-file": (current, value) => {
           current.boardFile = value;
         },
@@ -85,15 +88,13 @@ const main = async () => {
     return;
   }
 
-  const paths = options.boardFile
-    ? boardPathsFromFile(options.boardFile)
-    : createBoardPaths();
+  const source = openBoardSource(options);
 
   try {
-    const handoff = await waitForBoard(paths, {
+    const handoff = await waitForBoard(source, {
       onWaiting: () =>
         process.stderr.write(
-          `Waiting for the board to be sent (polling ${paths.board} every ${options.pollIntervalMs}ms)...\n`,
+          `Waiting for the board to be sent (polling ${source.location} every ${options.pollIntervalMs}ms)...\n`,
         ),
       pollIntervalMs: options.pollIntervalMs,
       reset: options.reset,

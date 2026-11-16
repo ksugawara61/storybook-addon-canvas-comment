@@ -47,6 +47,8 @@
     "LICENSE",
     "dist",
     "README.md",
+    "src/board/board-items.ts",
+    "src/board/board-schema.ts",
     "src/cloudflare",
     "src/comment-schema.ts",
     "src/constants.ts",
