@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readReviewStatus } from "./review-schema";
+import { parseReviewState, readReviewStatus } from "./review-schema";
 
 describe("readReviewStatus", () => {
   it.each([
@@ -24,4 +24,22 @@ describe("readReviewStatus", () => {
   ])("$name", ({ input, expected }) => {
     expect(readReviewStatus(input)).toBe(expected);
   });
+});
+
+describe("parseReviewState", () => {
+  it("reads a stored review", () => {
+    expect(
+      parseReviewState({ status: "completed", updatedAt: "2026-11-16T00:00:00.000Z" }),
+    ).toEqual({ status: "completed", updatedAt: "2026-11-16T00:00:00.000Z" });
+  });
+
+  it.each([undefined, null, { status: "done" }, "completed"])(
+    "reads %j as a review that has not completed",
+    (input) => {
+      expect(parseReviewState(input)).toEqual({
+        status: "reviewing",
+        updatedAt: null,
+      });
+    },
+  );
 });

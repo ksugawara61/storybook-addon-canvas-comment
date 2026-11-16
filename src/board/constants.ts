@@ -6,6 +6,7 @@ export const TOOL_ID = `${BOARD_ID}/tool`;
 export const PAGE_PATH = "/board/";
 
 export const BOARD_API_PATH = `${BASE_API_PATH}/board`;
+export const BOARD_REVIEW_API_PATH = `${BOARD_API_PATH}/review`;
 export const BOARD_FILE_RELATIVE_PATH = ".storybook/canvas-comments/board.json";
 export const INSTRUCTIONS_FILE_RELATIVE_PATH =
   ".storybook/canvas-comments/board-instructions.md";

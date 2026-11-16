@@ -4,7 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import { describe, expect, it } from "vitest";
-import { createBoardPaths, handleBoardRequest } from "./api";
+import {
+  createBoardPaths,
+  handleBoardRequest,
+  handleBoardReviewRequest,
+} from "./api";
 import type { BoardFile } from "./board-schema";
 
 const boardFile: BoardFile = {
@@ -55,6 +59,7 @@ const send = async (
   dir: string,
   method: string,
   body?: unknown,
+  handler = handleBoardRequest,
 ): Promise<{ body: unknown; status: number }> => {
   const response = { body: "", status: 0 };
   const res = {
@@ -66,7 +71,7 @@ const send = async (
       response.status = status;
     },
   } as unknown as ServerResponse;
-  await handleBoardRequest(request(method, body), res, createBoardPaths(dir));
+  await handler(request(method, body), res, createBoardPaths(dir));
   return { body: JSON.parse(response.body) as unknown, status: response.status };
 };
 
@@ -100,5 +105,42 @@ describe("handleBoardRequest", () => {
 
   it("rejects other methods", async () => {
     expect((await send(await tempDir(), "DELETE")).status).toBe(405);
+  });
+});
+
+const sendReview = (dir: string, method: string, body?: unknown) =>
+  send(dir, method, body, handleBoardReviewRequest);
+
+describe("handleBoardReviewRequest", () => {
+  it("reads as reviewing before anything is saved", async () => {
+    expect(await sendReview(await tempDir(), "GET")).toEqual({
+      body: { status: "reviewing", updatedAt: null },
+      status: 200,
+    });
+  });
+
+  it("stores the status in board.json and keeps it when the board is saved again", async () => {
+    const dir = await tempDir();
+    await send(dir, "PUT", boardFile);
+
+    const posted = await sendReview(dir, "POST", { status: "completed" });
+    expect(posted).toEqual({
+      body: { status: "completed", updatedAt: expect.any(String) },
+      status: 200,
+    });
+
+    await send(dir, "PUT", boardFile);
+    expect((await sendReview(dir, "GET")).body).toEqual(posted.body);
+    expect((await send(dir, "GET")).body).toEqual(boardFile);
+    const stored = JSON.parse(
+      await fs.readFile(join(dir, ".storybook/canvas-comments/board.json"), "utf8"),
+    ) as { review: unknown };
+    expect(stored.review).toEqual(posted.body);
+  });
+
+  it("rejects an invalid status and other methods", async () => {
+    const dir = await tempDir();
+    expect((await sendReview(dir, "POST", { status: "done" })).status).toBe(400);
+    expect((await sendReview(dir, "PUT")).status).toBe(405);
   });
 });

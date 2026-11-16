@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Send the board to a waiting coding agent.
+  **Send to agent** in the board's side panel sets a review status in `board.json`, like **Complete review** does for comments.
+  The `canvas-comments-wait-board` CLI blocks until then and prints the instructions, and `canvas-comments-board-resolve` clears the instructions the agent applied.
+  An open board page now picks up changes to `board.json` made outside it, so the cleared instructions disappear and the frames show the fixes.
+- Add the `board-fix` skill to the Claude Code plugin. It waits for the board, applies the instructions, clears them, and waits again.
+
 ## 0.3.5
 
 - Fit a placed component to its story when the preview stretches the story root to the viewport, as in `#storybook-root { height: 100% }` for full-screen React Native Web stories.

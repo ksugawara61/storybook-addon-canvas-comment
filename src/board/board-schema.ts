@@ -1,3 +1,5 @@
+import type { ReviewState } from "../types.ts";
+
 export type BoardFrame = {
   /** Args to override, in Storybook's URL format (`key:value;key2:value2`). */
   args: string;
@@ -211,5 +213,13 @@ export const parseBoardFile = (raw: unknown): BoardFile => {
   };
 };
 
-export const serializeBoardFile = (file: BoardFile): string =>
-  `${JSON.stringify(file, null, 2)}\n`;
+/** board.json also keeps the review status that tells a waiting agent the board is ready. */
+export const serializeBoardFile = (
+  file: BoardFile,
+  review?: ReviewState,
+): string =>
+  `${JSON.stringify(
+    { boards: file.boards, version: file.version, ...(review ? { review } : {}) },
+    null,
+    2,
+  )}\n`;
