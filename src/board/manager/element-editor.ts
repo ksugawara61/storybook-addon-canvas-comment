@@ -1,6 +1,6 @@
 import type { ElementEdit } from "../board-schema.ts";
 import { OVERLAY_ATTRIBUTE } from "../../constants.ts";
-import { ELEMENT_ACCENT } from "../constants.ts";
+import { ELEMENT_ACCENT, REMOVE_ACCENT } from "../constants.ts";
 import {
   buildSelector,
   describeElement,
@@ -46,12 +46,17 @@ const createPin = (
   rect: DOMRect,
   text: string,
   selected: boolean,
+  removed: boolean,
 ) => {
   const pin = doc.createElement("div");
   pin.textContent = text;
   Object.assign(pin.style, {
     alignItems: "center",
-    background: selected ? "#7e22ce" : ELEMENT_ACCENT,
+    background: removed
+      ? REMOVE_ACCENT
+      : selected
+        ? "#7e22ce"
+        : ELEMENT_ACCENT,
     borderRadius: "999px",
     color: "#fff",
     display: "flex",
@@ -60,6 +65,7 @@ const createPin = (
     justifyContent: "center",
     left: `${Math.max(rect.left - 9, 0)}px`,
     minWidth: "18px",
+    padding: "0 4px",
     position: "fixed",
     top: `${Math.max(rect.top - 9, 0)}px`,
   });
@@ -68,6 +74,7 @@ const createPin = (
 
 /**
  * Previews the instructions in the iframe DOM (translate, outline and a numbered pin).
+ * Elements to remove are faded out but kept in place, so they can still be picked.
  * The code is unchanged; this only shows what the result would look like.
  */
 export const applyEdits = (
@@ -78,6 +85,7 @@ export const applyEdits = (
   for (const element of doc.querySelectorAll(`[${APPLIED_ATTR}]`)) {
     if (isStyled(element)) {
       element.style.translate = "";
+      element.style.opacity = "";
       element.style.outline = "";
       element.style.outlineOffset = "";
     }
@@ -97,15 +105,17 @@ export const applyEdits = (
     }
     const selected = edit.id === selectedEditId;
     element.setAttribute(APPLIED_ATTR, edit.id);
-    element.style.translate = `${edit.dx}px ${edit.dy}px`;
-    element.style.outline = `2px ${selected ? "solid" : "dashed"} ${ELEMENT_ACCENT}`;
+    element.style.translate = edit.remove ? "" : `${edit.dx}px ${edit.dy}px`;
+    element.style.opacity = edit.remove ? "0.3" : "";
+    element.style.outline = `2px ${selected ? "solid" : "dashed"} ${edit.remove ? REMOVE_ACCENT : ELEMENT_ACCENT}`;
     element.style.outlineOffset = "1px";
     layer.append(
       createPin(
         doc,
         element.getBoundingClientRect(),
-        String(index + 1),
+        edit.remove ? `${index + 1} ✕` : String(index + 1),
         selected,
+        edit.remove,
       ),
     );
   }

@@ -19,7 +19,10 @@ export type BoardNote = {
   y: number;
 };
 
-/** An instruction for an element in a frame. With dx / dy at 0 it is a comment without a move. */
+/**
+ * An instruction for an element in a frame. With dx / dy at 0 it is a comment without a move.
+ * With `remove` set, the element is to be deleted, and dx / dy are ignored.
+ */
 export type ElementEdit = {
   createdAt: string;
   dx: number;
@@ -28,6 +31,7 @@ export type ElementEdit = {
   id: string;
   label: string;
   note: string;
+  remove: boolean;
   selector: string;
 };
 
@@ -178,9 +182,10 @@ const parseBoard = (value: unknown): Board | undefined => {
           component !== undefined && frameIds.has(component.frameId),
       ),
     // Instructions for a removed frame can be neither shown nor applied, so drop them on load.
-    edits: filterArray(value.edits, isElementEdit).filter((edit) =>
-      frameIds.has(edit.frameId),
-    ),
+    // `remove` was added later, so files without it still load.
+    edits: filterArray(value.edits, isElementEdit)
+      .filter((edit) => frameIds.has(edit.frameId))
+      .map((edit) => ({ ...edit, remove: edit.remove === true })),
     frames,
     id: value.id,
     name: value.name,

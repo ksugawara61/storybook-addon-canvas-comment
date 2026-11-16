@@ -20,6 +20,7 @@ const boardFile: BoardFile = {
           id: "edit-1",
           label: 'button "Save"',
           note: "Align with the title",
+          remove: false,
           selector: "#storybook-root > button",
         },
       ],

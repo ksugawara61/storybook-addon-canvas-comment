@@ -44,7 +44,10 @@ const formatFrame = (board: Board, frame: BoardFrame): string => {
   const editLines = board.edits
     .filter((edit) => edit.frameId === frame.id)
     .map((edit, index) => {
-      const details = [formatMove(edit.dx, edit.dy), edit.note.trim()]
+      const action = edit.remove
+        ? "remove this element"
+        : formatMove(edit.dx, edit.dy);
+      const details = [action, edit.note.trim()]
         .filter((detail) => detail !== undefined && detail !== "")
         .join(" / ");
       return `${index + 1}. ${edit.label} (\`${edit.selector}\`): ${details || "(no instruction)"}`;
@@ -105,6 +108,7 @@ export const toInstructionsMarkdown = (boards: Board[]): string =>
     "# Storybook board instructions",
     "",
     "Moves are in rendered CSS px. Apply them as spacing or layout changes in the code.",
+    'Delete elements marked "remove this element" from the code.',
     "Components to add come from a design system. Import them as shown and place them where they were dropped; positions are in the frame's CSS px from its top-left corner.",
     "",
     boards.map(formatBoard).join("\n\n"),
