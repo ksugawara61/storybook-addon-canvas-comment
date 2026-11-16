@@ -20,6 +20,7 @@ import { COMPONENT_ACCENT, ELEMENT_ACCENT } from "../constants.ts";
 import { BoardComponent } from "./board-component.tsx";
 import { startDrag } from "./drag.ts";
 import { setFrameDocument } from "./frame-documents.ts";
+import { loadStoryArgTypes } from "./story-arg-types.ts";
 import { updateActiveBoard } from "./store.ts";
 import type { BoardMode } from "./types.ts";
 import { useAppliedEdits, useElementEditor } from "./use-frame-document.ts";
@@ -139,7 +140,13 @@ export const BoardFrame = ({
         }}
       >
         <iframe
-          onLoad={() => setDoc(iframeRef.current?.contentDocument ?? null)}
+          onLoad={() => {
+            setDoc(iframeRef.current?.contentDocument ?? null);
+            void loadStoryArgTypes(
+              iframeRef.current?.contentWindow,
+              frame.storyId,
+            );
+          }}
           ref={iframeRef}
           src={buildFrameUrl(frame)}
           style={{

@@ -170,7 +170,7 @@ It then leaves a note and shows the Markdown the board writes for a coding agent
 | Add a frame | Type in **Add a story…** at the top and press `Enter`, or press **+ Board** on a story. |
 | Duplicate a frame | **Duplicate** in the frame header. Its instructions are copied too, so the copy can branch off as another variant. |
 | Move and resize | Drag a frame by its header, or anywhere on it in Select mode. Drag the bottom-right corner to resize, or pick **Mobile** / **Tablet** / **Desktop** in the side panel. |
-| Override args | Type args in the side panel in Storybook's URL format, such as `label:Save;disabled:!true`. |
+| Override args | Set the story's props in the side panel. Each prop gets an input for its type (a checkbox, a select of its options, a number or text field) with its type and default. **Reset** goes back to the story's value. **Raw args** takes Storybook's URL format, such as `label:Save;disabled:!true`, for what the inputs do not cover. |
 | Pan and zoom | Drag the background or scroll to pan. `Ctrl` / `Cmd` + scroll zooms. **Fit** shows every frame. |
 | Several boards | Pick a board in the toolbar, or use **New**, **Rename** and **Delete**. |
 
@@ -242,7 +242,7 @@ The panel groups the stories by component, and each story is a variant you can d
   The component goes where you drop it, and takes the height of its rendered story.
 - Click a story, or focus it and press `Enter`, to add it to the top-left of the selected frame (or of the first frame).
 - Drag a placed component to move it, and drag its bottom-right corner to resize it.
-- In the side panel, give it args in Storybook's URL format, such as `title:Saved`, and describe how to use it.
+- In the side panel, set its props (or type raw args in Storybook's URL format, such as `title:Saved`), and describe how to use it.
 
 The component name comes from the last part of the story title.
 `UI/Alert` gives `Alert`, and an auto title such as `buttons/primary-button` gives `PrimaryButton`.
