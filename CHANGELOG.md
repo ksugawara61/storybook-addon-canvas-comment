@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.3.6
+
 - Send the board to a waiting coding agent.
   **Send to agent** in the board's side panel sets a review status in `board.json`, like **Complete review** does for comments.
   The `canvas-comments-wait-board` CLI blocks until then and prints the instructions, and `canvas-comments-board-resolve` clears the instructions the agent applied.
