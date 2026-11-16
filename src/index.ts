@@ -12,8 +12,10 @@ import {
 } from "./board/constants.ts";
 import {
   type DesignSystemOption,
+  LIBRARY_TAG,
   normalizeDesignSystems,
 } from "./board/design-system.ts";
+import { isLibraryOption, libraryStoriesEntries } from "./board/library.ts";
 import {
   createCanvasCommentReply,
   isCanvasComment,
@@ -70,6 +72,43 @@ export const previewAnnotations = (entries: string[] = []) => [
   ...entries,
   previewEntry,
 ];
+
+type StoriesEntry = string | { directory: string; files?: string; titlePrefix?: string };
+
+// Storybook applies `stories` several times while it starts, so the stories are written once per option set.
+const libraryEntriesCache = new Map<
+  string,
+  Promise<{ directory: string; files: string }[]>
+>();
+
+/** Adds the stories the preset writes for design systems without stories (`components`). */
+export const stories = async (
+  entries: StoriesEntry[] = [],
+  options: CanvasCommentsPresetOptions = {},
+): Promise<StoriesEntry[]> => {
+  const libraries = (options.designSystems ?? []).filter(isLibraryOption);
+  if (libraries.length === 0) {
+    return entries;
+  }
+  const workingDir = process.cwd();
+  const key = JSON.stringify([workingDir, libraries]);
+  const cached =
+    libraryEntriesCache.get(key) ?? libraryStoriesEntries(libraries, workingDir);
+  libraryEntriesCache.set(key, cached);
+  return [...entries, ...(await cached)];
+};
+
+/** Hides the stories written for design systems without stories from the sidebar. */
+export const tags = (
+  existing: Record<string, unknown> = {},
+  options: CanvasCommentsPresetOptions = {},
+): Record<string, unknown> =>
+  (options.designSystems ?? []).some(isLibraryOption)
+    ? {
+        ...existing,
+        [LIBRARY_TAG]: { excludeFromDocsStories: true, excludeFromSidebar: true },
+      }
+    : existing;
 
 export const env = (
   existing: Record<string, string> = {},

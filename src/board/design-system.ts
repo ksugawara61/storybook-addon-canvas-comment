@@ -14,10 +14,23 @@ export type DesignSystemOption = {
   ref?: string;
   /** Only stories whose title starts with this, such as `UI/`. Leave it out to use every story. */
   titlePrefix?: string;
+  /**
+   * The components of a library that has no stories.
+   * `"auto"` lists the components that `importPath` exports, and an array names them.
+   * The preset writes a story for each one, hidden from the sidebar, so the board can render it.
+   * `ref` and `titlePrefix` are ignored.
+   */
+  components?: "auto" | string[];
+  /** With `components: "auto"`, exports to leave out, such as providers. */
+  exclude?: string[];
+  /** Args for a component's generated story, by component name, for props it cannot render without. */
+  args?: Record<string, Record<string, unknown>>;
 };
 
 export type DesignSystem = {
   importPath: string;
+  /** A library without stories, rendered from the stories the preset writes (`components`). */
+  library: boolean;
   name: string;
   ref: string | undefined;
   titlePrefix: string;
@@ -49,6 +62,7 @@ export type LibraryGroup = {
 export type IndexEntryLike = {
   id: string;
   name: string;
+  tags?: string[];
   title?: string;
   type: string;
 };
@@ -64,15 +78,43 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const optionalString = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
 
+/** Tag of the stories the preset writes for a library's components. Hidden from the sidebar. */
+export const LIBRARY_TAG = "canvas-comments-library";
+
+/** Whether an index entry is a story the preset wrote for a library's component. */
+export const isLibraryEntry = (entry: Pick<IndexEntryLike, "tags">): boolean =>
+  entry.tags?.includes(LIBRARY_TAG) ?? false;
+
+/** Title prefix of the stories the preset writes for a library's components. */
+export const libraryTitlePrefix = (name: string): string =>
+  `Canvas Comments Library/${name}/`;
+
+const isLibraryComponents = (value: unknown): value is "auto" | string[] =>
+  value === "auto" || Array.isArray(value);
+
 export const normalizeDesignSystems = (raw: unknown): DesignSystem[] =>
   (Array.isArray(raw) ? raw : []).flatMap((item): DesignSystem[] => {
     const name = isRecord(item) ? optionalString(item.name) : undefined;
     if (!isRecord(item) || !name) {
       return [];
     }
+    const importPath = optionalString(item.importPath) ?? name;
+    // `library` is set when the manager reads the list the preset already normalized.
+    if (isLibraryComponents(item.components) || item.library === true) {
+      return [
+        {
+          importPath,
+          library: true,
+          name,
+          ref: undefined,
+          titlePrefix: libraryTitlePrefix(name),
+        },
+      ];
+    }
     return [
       {
-        importPath: optionalString(item.importPath) ?? name,
+        importPath,
+        library: false,
         name,
         ref: optionalString(item.ref),
         titlePrefix: typeof item.titlePrefix === "string" ? item.titlePrefix : "",
@@ -118,7 +160,8 @@ const toComponents = (
     if (
       entry.type !== "story" ||
       title === undefined ||
-      !title.startsWith(designSystem.titlePrefix)
+      !title.startsWith(designSystem.titlePrefix) ||
+      isLibraryEntry(entry) !== designSystem.library
     ) {
       continue;
     }

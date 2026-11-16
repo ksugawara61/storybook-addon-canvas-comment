@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 import { useStorybookState } from "storybook/manager-api";
 import { useTheme } from "storybook/theming";
 import { addFrame } from "../board-state.ts";
+import { isLibraryEntry } from "../design-system.ts";
 import { updateActiveBoard } from "./store.ts";
 
 const MAX_RESULTS = 30;
@@ -24,6 +25,8 @@ export const StoryPicker = () => {
     () =>
       Object.values(index ?? {})
         .filter((entry) => entry.type === "story")
+        // Stories written for a library without stories are placed from the component library only.
+        .filter((entry) => !isLibraryEntry(entry))
         .map((entry) => ({
           storyId: entry.id,
           title: `${entry.title} / ${entry.name}`,

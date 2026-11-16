@@ -21,6 +21,7 @@ const toIndex = (entries: IndexEntryLike[]) =>
 
 const localSystem: DesignSystem = {
   importPath: "@example/ui",
+  library: false,
   name: "Example UI",
   ref: undefined,
   titlePrefix: "UI/",
@@ -35,7 +36,47 @@ describe("normalizeDesignSystems", () => {
         "not an object",
       ]),
     ).toEqual([
-      { importPath: "@acme/ui", name: "@acme/ui", ref: "ui", titlePrefix: "" },
+      {
+        importPath: "@acme/ui",
+        library: false,
+        name: "@acme/ui",
+        ref: "ui",
+        titlePrefix: "",
+      },
+    ]);
+  });
+
+  it("reads a library without stories from its generated stories, ignoring ref and titlePrefix", () => {
+    expect(
+      normalizeDesignSystems([
+        { components: "auto", name: "@acme/ui", ref: "ui", titlePrefix: "UI/" },
+        { components: ["Button"], importPath: "./ui", name: "Local UI" },
+      ]),
+    ).toEqual([
+      {
+        importPath: "@acme/ui",
+        library: true,
+        name: "@acme/ui",
+        ref: undefined,
+        titlePrefix: "Canvas Comments Library/@acme/ui/",
+      },
+      {
+        importPath: "./ui",
+        library: true,
+        name: "Local UI",
+        ref: undefined,
+        titlePrefix: "Canvas Comments Library/Local UI/",
+      },
+    ]);
+  });
+
+  it("keeps a library without stories a library when the manager reads the normalized JSON", () => {
+    const [normalized] = normalizeDesignSystems([
+      { components: "auto", name: "@acme/ui" },
+    ]);
+
+    expect(parseDesignSystems(JSON.stringify([normalized]))).toEqual([
+      normalized,
     ]);
   });
 
@@ -91,6 +132,7 @@ describe("buildLibrary", () => {
   it("reads a composed Storybook's index for a design system with ref", () => {
     const remote: DesignSystem = {
       importPath: "@acme/ui",
+      library: false,
       name: "@acme/ui",
       ref: "ui",
       titlePrefix: "",
@@ -113,6 +155,50 @@ describe("buildLibrary", () => {
       buildLibrary([remote], index, { ui: { indexError: new Error("CORS") } })[0]
         ?.status,
     ).toBe("missing");
+  });
+});
+
+describe("buildLibrary for a library without stories", () => {
+  const library: DesignSystem = {
+    importPath: "@acme/ui",
+    library: true,
+    name: "@acme/ui",
+    ref: undefined,
+    titlePrefix: "Canvas Comments Library/@acme/ui/",
+  };
+  const generated = (componentName: string): IndexEntryLike => ({
+    ...story(
+      `canvas-comments-library-acme-ui-${componentName.toLowerCase()}--default`,
+      `Canvas Comments Library/@acme/ui/${componentName}`,
+      "Default",
+    ),
+    tags: ["dev", "canvas-comments-library"],
+  });
+  const index = toIndex([
+    generated("ListHeader"),
+    generated("Button"),
+    story("ui-alert--info", "UI/Alert", "Info"),
+  ]);
+
+  it("lists the generated stories by component name", () => {
+    expect(
+      buildLibrary([library], index, undefined)[0]?.components.map(
+        (component) => [component.componentName, component.importPath],
+      ),
+    ).toEqual([
+      ["ListHeader", "@acme/ui"],
+      ["Button", "@acme/ui"],
+    ]);
+  });
+
+  it("keeps the generated stories out of a design system of stories", () => {
+    expect(
+      buildLibrary(
+        [{ ...localSystem, titlePrefix: "" }],
+        index,
+        undefined,
+      )[0]?.components.map((component) => component.componentName),
+    ).toEqual(["Alert"]);
   });
 });
 
