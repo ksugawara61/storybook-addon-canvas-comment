@@ -29,8 +29,10 @@ The stories come in variants to compare: `Button` (Primary / Secondary), `Produc
 
 1. Type `signup` in **Add a story…** and add both SignupForm stories.
 2. Press **Duplicate** on the Default frame.
-3. Switch to **Element** (`E`), drag the **Sign up** button in the copy, and type what to change in the side panel.
-4. Switch to **Note** (`N`) and click the board to leave a note.
+3. Select the copy and change its `title` prop in the side panel.
+4. Switch to **Element** (`E`), drag the **Sign up** button in the copy, and type what to change in the side panel.
+5. Click the **Cancel** button and press **Remove element** in the side panel.
+6. Switch to **Note** (`N`) and click the board to leave a note.
 
 ### Add components from the design system
 
@@ -40,7 +42,7 @@ Its stories are titled `UI/…`, and the `designSystems` preset option makes the
 1. Press **Components** in the board toolbar if the panel is hidden.
 2. Drag **Checkbox → Unchecked** onto the SignupForm frame, between the Email field and the buttons.
 3. Drag **Alert → Danger** above the form, and type in the side panel when it should show.
-4. In the side panel, give the Checkbox args such as `label:I agree to the Terms` to change its text.
+4. Select the Checkbox and set its `label` and `defaultChecked` props in the side panel.
 
 The board is saved to `examples/react-vite/.storybook/canvas-comments/board.json`.
 The instructions for a coding agent are written next to it, to `board-instructions.md`:
