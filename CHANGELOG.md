@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Fit a placed component to its story when the preview stretches the story root to the viewport, as in `#storybook-root { height: 100% }` for full-screen React Native Web stories.
+  The board measured the stretched root, so every component kept its first height: short ones had blank space below them and tall ones were cut off.
+
 ## 0.3.4
 
 - Put the components of a library without stories on the board.
