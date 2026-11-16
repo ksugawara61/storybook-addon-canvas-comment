@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.3.7
+
 - Show a placed component whose story is all positioned content, such as a floating action button (`position: absolute; right: 20px; bottom: 24px`).
   The board lets the story root take the height of its content, so such a root had no height, the content was placed above the top of the box, and the component showed nothing.
   Now the root fills the box like a screen when the content in flow has no height, and a newly placed component takes the height that shows the positioned content.
