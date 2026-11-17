@@ -164,11 +164,14 @@ Pass `--no-reset` to skip the reset. Other options:
 The board compares stories side by side and collects fix instructions across them.
 Open it at `/?path=/board/`, or press **+ Board** in the toolbar of a story to add that story and open the board.
 
-![Adding stories to the board, duplicating a frame, setting its title prop, moving, removing and commenting on elements, leaving a note, and the Markdown handed to a coding agent](docs/images/board-demo.gif)
+![Adding stories to the board, duplicating a frame, setting its title prop, moving, removing and commenting on elements, leaving a note, then sending the board to a waiting agent, which fixes the code and clears the instructions](docs/images/board-demo.gif)
 
 The demo adds two SignupForm stories and duplicates one of them.
 In the copy, it sets the `title` prop in the side panel, moves the **Sign up** button, marks the **Cancel** button for removal, and comments on the heading.
-It then leaves a note and shows the Markdown the board writes for a coding agent.
+It then leaves a note and clicks **Send to agent**.
+An agent waiting with `wait-board` receives the instructions as Markdown and changes the component's code, and the frames reload with the fix.
+It clears the instructions it applied with `board-resolve` and waits for the next round.
+The terminal shows the real CLI output; see [Sending the board to a coding agent](#sending-the-board-to-a-coding-agent).
 
 | Action | How |
 | --- | --- |
