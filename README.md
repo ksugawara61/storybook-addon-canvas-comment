@@ -14,6 +14,9 @@ A **board** page lays several stories side by side, like a design canvas.
 You can duplicate a frame, set its props, drag elements to where they should go, mark elements for removal, and leave notes.
 You can also drop components from your design system onto a frame.
 The board writes those instructions as Markdown for a coding agent.
+**Send to agent** hands them to an agent waiting with the `wait-board` CLI.
+The agent fixes the code, clears the instructions it applied from the board, and waits for the next round.
+The loop runs against a local Storybook dev server, or against a pull request's preview Storybook.
 
 ## Demo
 
@@ -40,7 +43,8 @@ The [Board](#board) section has a demo of the board page.
 | Replies | Each comment has a reply thread. Reviewers reply from the panel. Coding agents reply with the `reply` CLI to explain what they changed. The thread is shown in the panel and in the pin tooltip. |
 | Review-completion signal | A "Complete review" button in the panel flips a review status flag. A waiting coding agent can detect it. "Reopen review" flips it back. |
 | Agent-friendly output | The `dom-map` and `wait-comments` CLIs pair each comment with its saved DOM snapshot. They emit JSON built for LLM consumption. |
-| Board | A board page (`/?path=/board/`) lays stories out as frames to compare variants. Drag elements in a frame to leave move instructions, mark them for removal, comment on them, and put notes on the board. Drag components from a design system onto a frame to show what to add. The instructions are written as Markdown for coding agents. **Send to agent** signals a coding agent waiting with the `wait-board` CLI, which applies them and clears them from the board. See [Board](#board). |
+| Board | A board page (`/?path=/board/`) lays stories out as frames to compare variants. Drag elements in a frame to leave move instructions, mark them for removal, comment on them, and put notes on the board. Drag components from a design system onto a frame to show what to add. The instructions are written as Markdown for coding agents. Works on a phone too. See [Board](#board). |
+| Board agent loop | **Send to agent** signals a coding agent waiting with the `wait-board` CLI. The agent applies the instructions, clears them with `board-resolve`, and waits again. It works with a local dev server or a pull request's preview Storybook, and the Claude Code plugin's `board-fix` and `board-fix-remote` skills run it. See [Sending the board to a coding agent](#sending-the-board-to-a-coding-agent). |
 
 ## Requirements
 
@@ -191,6 +195,12 @@ Each instruction gets a numbered pin, and moves are previewed inside the frame w
 To delete an element, click it and press **Remove element** on its instruction in the side panel.
 The element is faded out in the frame and its pin turns red; press **Keep element** to undo.
 The story code does not change; a coding agent or a person makes the real fix.
+See [Sending the board to a coding agent](#sending-the-board-to-a-coding-agent).
+
+The board works on a phone, for example to review a pull request's preview.
+Below 900px wide, the toolbar fits in two rows, and the Components panel and the side panel (**Details**) open as bottom sheets over the canvas.
+Selecting an instruction or a component opens **Details**.
+Two fingers pan and pinch-zoom the board, and **← Stories** goes back to the stories.
 
 ### Design system components
 
@@ -345,21 +355,49 @@ See [Hosted mode](#hosted-mode-cloudflare-pages--r2).
 
 ### Sending the board to a coding agent
 
-A coding agent can wait for the board, apply its instructions, and hand it back, round after round:
+A coding agent can wait for the board, apply its instructions, and hand it back, round after round.
+You stay on the board, and the agent stays in its terminal:
 
 1. The agent runs `canvas-comments-wait-board` and waits.
-2. You collect instructions on the board, then click **Send to agent** in the **Agent** section of the side panel.
-   Pending edits are saved first, and the status turns to **Sent to agent**.
-3. The CLI prints the instructions and exits. The agent changes the code.
-4. The agent clears the instructions it applied with `canvas-comments-board-resolve`.
-   The board page picks the change up within a few seconds, and the frames reload with the fixes.
-5. The agent runs `canvas-comments-wait-board` again, which sets the status back to **Editing**.
+   The **Agent** section of the side panel shows **Editing**.
+2. You collect instructions on the board: moves, removals, comments, components to add, and notes, on any of your boards.
+3. You click **Send to agent**. Pending edits are saved first, and the status turns to **Sent to agent**.
+   The button is disabled while no board has an instruction.
+4. `wait-board` prints the instructions of every board and exits. The agent changes the code.
+5. The agent clears the instructions it applied with `canvas-comments-board-resolve`.
+   The board page picks the change up within a few seconds, and the instructions disappear from it.
+   Frames stay, so you can check the fixes in them.
+   Instructions you added while the agent worked stay too, for the next round.
+6. The agent runs `wait-board` again, which sets the status back to **Editing**, and the next round starts.
 
-**Reopen** takes the board back before an agent picks it up.
+Until the agent picks the board up, **Reopen** takes it back so you can keep editing.
+An instruction the agent cannot apply, because it is unclear or conflicts with the code, is left on the board; the agent should say why.
+
+The loop runs in two places:
+
+| | Local dev server | Pull request preview |
+| --- | --- | --- |
+| Where the board is saved | `.storybook/canvas-comments/board.json` | `<app>/board.json` in R2, through the [hosted API](#hosted-mode-cloudflare-pages--r2) |
+| How the agent waits | `wait-board` | `wait-board --api-url <url>` |
+| When the frames show the fixes | Storybook reloads them as soon as the code changes | Once the agent pushes and the preview is redeployed; reload the board then |
+| Claude Code skill | [`board-fix`](#claude-code-plugin) | [`board-fix-remote`](#claude-code-plugin), which also commits and pushes to the PR branch |
+
 The **Agent** section is shown with the dev server, and in a static build that uses the [hosted API](#hosted-mode-cloudflare-pages--r2).
-A static build without it has no API to signal through.
-The [`board-fix` skill](#claude-code-plugin) runs this loop in Claude Code.
-The `board-fix-remote` skill runs it against a pull request's preview Storybook, and pushes each round's fixes to the PR branch.
+A static build without it keeps the board in the browser and has no API to signal through; use **Copy as Markdown** there.
+
+With the [Claude Code plugin](#claude-code-plugin) installed, a round looks like this:
+
+```text
+# Local: start Storybook, then in Claude Code
+/canvas-comments:board-fix
+
+# Pull request preview: in Claude Code, on the PR branch or anywhere that can reach the preview
+/canvas-comments:board-fix-remote pr=123
+```
+
+Claude tells you when it is waiting.
+Click **Send to agent** whenever a round of instructions is ready, on a laptop or a phone.
+Claude reports what it changed and what it left on the board, then waits for the next round.
 
 The status is stored in `board.json` under `review`, in the same shape as the comments' review status:
 
