@@ -44,6 +44,7 @@ All args are optional.
 - Run the CLIs from the package that has the addon installed, with the project's package manager
   (`pnpm exec`, `npx`, `yarn`, ...). In a pnpm workspace, `pnpm --filter <package> exec ...`.
   Install dependencies first if `node_modules` is missing.
+  If the addon is not installed there, run each CLI with `npx -p storybook-addon-canvas-comments <cli> ...`.
 - The preview must be deployed with the addon's Pages Functions, an R2 bucket bound as `CANVAS_COMMENTS_BUCKET`,
   and the preset option `apiUrl` set (see "Hosted mode" in the addon's README).
   Without `apiUrl`, the preview's board saves to the reviewer's browser and cannot signal an agent: say so and stop.

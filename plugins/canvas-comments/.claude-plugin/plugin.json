@@ -1,6 +1,6 @@
 {
   "name": "canvas-comments",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Turn open Storybook canvas comments into GitHub issues, and apply the Storybook board's fix instructions when the user sends them, locally or from a pull request's preview Storybook.",
   "author": {
     "name": "ksugawara61"

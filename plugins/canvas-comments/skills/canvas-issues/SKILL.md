@@ -41,7 +41,9 @@ The defaults below apply when it does not exist or says nothing on a point.
 ### Step 1: Read the comments
 
 Run the `canvas-comments-dom-map` CLI from the package that has the addon installed.
-Use the project's package manager (`pnpm exec`, `npx`, `yarn`, ...):
+Use the project's package manager (`pnpm exec`, `npx`, `yarn`, ...).
+If the addon is not installed (Storybook runs in the temporary mode, `npx storybook-addon-canvas-comments dev`),
+use `npx -p storybook-addon-canvas-comments canvas-comments-dom-map ...`:
 
 ```bash
 pnpm exec canvas-comments-dom-map \

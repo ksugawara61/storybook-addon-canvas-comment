@@ -5,7 +5,8 @@
     "canvas-comments-dom-map": "./dist/cli/dom-map.js",
     "canvas-comments-reply": "./dist/cli/reply.js",
     "canvas-comments-wait-board": "./dist/cli/wait-board.js",
-    "canvas-comments-wait-comments": "./dist/cli/wait-comments.js"
+    "canvas-comments-wait-comments": "./dist/cli/wait-comments.js",
+    "storybook-addon-canvas-comments": "./dist/cli/storybook.js"
   },
   "bugs": {
     "url": "https://github.com/ksugawara61/storybook-addon-canvas-comments/issues"

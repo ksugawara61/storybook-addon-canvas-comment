@@ -29,6 +29,9 @@ All args are optional.
 
 - Run the CLIs from the package that has the addon installed, with the project's package manager
   (`pnpm exec`, `npx`, `yarn`, ...). In a pnpm workspace, `pnpm --filter <package> exec ...`.
+- If the addon is not installed (no `storybook-addon-canvas-comments` in `package.json`), use the temporary mode:
+  start Storybook with `npx storybook-addon-canvas-comments dev`,
+  and run each CLI with `npx -p storybook-addon-canvas-comments <cli> ...`. Do not add the addon to the project.
 - The board saves to `board.json` only through the Storybook dev server.
   If Storybook is not running, start it in the background (`storybook dev`), or ask the user to.
   A statically built Storybook keeps the board in the browser and cannot signal an agent.
