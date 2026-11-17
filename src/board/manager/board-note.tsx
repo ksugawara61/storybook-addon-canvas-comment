@@ -99,6 +99,8 @@ export const BoardNote = ({
       </div>
       <textarea
         aria-label="Note text"
+        // board-page.tsx makes this 16px on touch screens so iOS does not zoom in on it.
+        data-board-note-text=""
         onChange={(event) =>
           updateActiveBoard((board) =>
             updateNote(board, note.id, { body: event.target.value }),

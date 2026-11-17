@@ -68,8 +68,11 @@ const DEFAULT_COMPONENT_OFFSET = 16;
 type Sheet = "details" | "library";
 
 // The board UI is styled inline; these rules need media queries.
-// Inputs below 16px make iOS Safari zoom the page when they are focused.
-// The notes on the canvas (role="application") scale with the board, so they keep their size.
+// Inputs below 16px make iOS Safari zoom the page when they are focused, and the zoom stays after
+// the input loses focus: two fingers on the canvas pinch the board, not the page, so the header
+// stays out of view. Touch screens wider than a phone (an iPad) zoom too, hence pointer: coarse.
+// The other fields on the canvas (role="application") scale with the board, so they keep their size,
+// but a note's text is typed into on the canvas, so it takes 16px as well.
 const RESPONSIVE_CSS = `
 @media ${MOBILE_MEDIA_QUERY} {
   /* Storybook's page container on a phone is as tall as its content, so 100% would collapse the canvas. */
@@ -78,8 +81,9 @@ const RESPONSIVE_CSS = `
     height: 100dvh !important;
   }
 }
-@media ${COMPACT_MEDIA_QUERY} {
-  [data-board-page] :is(input, select, textarea):not([role="application"] *) {
+@media ${COMPACT_MEDIA_QUERY}, (pointer: coarse) {
+  [data-board-page] :is(input, select, textarea):not([role="application"] *),
+  [data-board-page] [data-board-note-text] {
     font-size: 16px !important;
   }
 }
