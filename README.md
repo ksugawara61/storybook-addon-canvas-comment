@@ -64,6 +64,8 @@ npm install -D storybook-addon-canvas-comments
 yarn add -D storybook-addon-canvas-comments
 ```
 
+To try it without installing, see [temporary mode](#trying-it-without-installing-temporary-mode).
+
 The release workflow builds `dist/` and ships it in the npm package.
 The package has no install-time scripts (`preinstall`, `install`, `postinstall`, or `prepare`).
 So pnpm needs no `allowBuilds` entry for it.
@@ -81,6 +83,38 @@ const config: StorybookConfig = {
 
 export default config;
 ```
+
+## Trying it without installing (temporary mode)
+
+To try the addon on a project, or to review a project once, run your Storybook with it straight from npx.
+Nothing is added to `package.json` or `.storybook/main.*`:
+
+```bash
+npx storybook-addon-canvas-comments dev
+# or
+pnpm dlx storybook-addon-canvas-comments dev
+```
+
+Run it where you run Storybook.
+It writes a config directory next to yours, `.storybook-canvas-comments/`, that loads your main config and adds the addon to its `addons`.
+It then runs your project's own `storybook dev` with that directory, and deletes the directory when Storybook exits.
+The directory has its own `.gitignore`, so git ignores it while it exists.
+
+- Every other option goes to Storybook, such as `-p 6006` or `--no-open`.
+- `-c, --config-dir <dir>` — your config directory, if it is not `.storybook`.
+- `--addon-options <json>` — the addon's preset options (`board`, [`designSystems`](#design-system-components), [`apiUrl`](#hosted-mode-cloudflare-pages--r2)), such as `'{"board":false}'`.
+- `npx storybook-addon-canvas-comments build` runs `storybook build` the same way.
+
+Comments and boards are saved to `.storybook/canvas-comments/`, as with the addon installed.
+Run the CLIs below with `npx -p storybook-addon-canvas-comments`, for example:
+
+```bash
+npx -p storybook-addon-canvas-comments canvas-comments-wait-comments
+npx -p storybook-addon-canvas-comments canvas-comments-wait-board
+```
+
+The temporary mode needs the same setup as the addon: Storybook with the Vite builder, installed in the project.
+If your main config already lists the addon, it adds nothing and warns.
 
 ## Usage
 

@@ -40,6 +40,7 @@ export default defineConfig([
       "cli/board-resolve": "src/cli/board-resolve.ts",
       "cli/dom-map": "src/cli/dom-map.ts",
       "cli/reply": "src/cli/reply.ts",
+      "cli/storybook": "src/cli/storybook.ts",
       "cli/wait-board": "src/cli/wait-board.ts",
       "cli/wait-comments": "src/cli/wait-comments.ts",
     },
