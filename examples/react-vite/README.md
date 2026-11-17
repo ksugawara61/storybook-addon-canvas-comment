@@ -51,6 +51,21 @@ The instructions for a coding agent are written next to it, to `board-instructio
 cat .storybook/canvas-comments/board-instructions.md
 ```
 
+### Send the board to an agent
+
+Play the coding agent from a terminal in this directory, with Storybook running:
+
+```bash
+# Wait until you click "Send to agent" in the board's side panel
+pnpm exec canvas-comments-wait-board --format json
+
+# After changing the code, clear the instructions you applied (ids from the output above)
+pnpm exec canvas-comments-board-resolve --ids <id>,<id>
+```
+
+The status in the **Agent** section turns from **Editing** to **Sent to agent**, and the cleared instructions disappear from the board within a few seconds.
+In Claude Code with the plugin installed, `/canvas-comments:board-fix` runs the same loop and edits the code for you.
+
 After you change the addon, run `pnpm build` at the root again, then reinstall here so the copied package is refreshed:
 
 ```bash
