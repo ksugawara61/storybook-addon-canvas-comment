@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.3.8
+
 - Keep iOS from zooming in when a note on the board is written on a phone.
   A note's text was 13px, so focusing it zoomed the page, and since two fingers on the canvas pinch the board rather than the page, there was no way to zoom back out and the toolbar stayed out of view.
   On touch screens and below 900px wide, a note's text is now 16px like the other inputs; touch screens wider than that (an iPad) get 16px inputs too.
