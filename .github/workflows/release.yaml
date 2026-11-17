@@ -1,123 +1,167 @@
-# Publishes to npm with Trusted Publishing (OIDC). No NPM_TOKEN is used.
+# Bumps the version, pushes the release commit and tag to main, and publishes
+# to npm with Trusted Publishing (OIDC). No NPM_TOKEN is used.
 # On npmjs.com, the package's Trusted Publisher points at this repository,
 # this workflow file (release.yaml), and the "npm" environment, and allows
 # only staged publishing (neither "Allow npm publish" nor "Allow npm dist-tag").
 name: Release
 on:
-  pull_request:
-    branches: [main]
-    types: [closed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version type"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 permissions:
   contents: read
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
-    if: >-
-      github.event.pull_request.merged == true &&
-      contains(github.event.pull_request.labels.*.name, 'Type: Release')
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    # Add required reviewers to this environment to gate every publish.
+    # Add required reviewers to this environment to gate every release.
     environment: npm
     permissions:
-      contents: write # create the tag and the GitHub Release
+      contents: write # push the release commit and tag, create the GitHub Release
       id-token: write # OIDC token for npm Trusted Publishing
-      pull-requests: write # comment the result on the release PR
     steps:
+      # Check out the commit the run was started on, so a re-run computes the
+      # same version as the first attempt.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Get package info
-        id: package
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".node-version"
+      # npm version works without installing dependencies
+      - name: Version bump
+        id: version
+        env:
+          VERSION_TYPE: ${{ inputs.version }}
         run: |
+          npm version "$VERSION_TYPE" --no-git-tag-version
           echo "version=$(jq -r '.version' package.json)" >> "$GITHUB_OUTPUT"
           echo "name=$(jq -r '.name' package.json)" >> "$GITHUB_OUTPUT"
-      # Re-running after a successful release does nothing.
-      - name: Check if the release exists
+      # A re-run after the release commit was pushed resumes from the tag
+      # instead of bumping again.
+      - name: Check if the tag exists
         id: tag-check
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.package.outputs.version }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" > /dev/null 2>&1; then
-            echo "Tag v$VERSION already exists"
+            echo "Tag v$VERSION already exists - resuming the release from it"
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
-      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.tag-check.outputs.exists == 'true'
+        with:
+          ref: refs/tags/v${{ steps.version.outputs.version }}
+          persist-credentials: false
+      - name: Move Unreleased changes under the new version in CHANGELOG.md
         if: steps.tag-check.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: sed -i "0,/^## Unreleased$/s//## Unreleased\n\n## ${VERSION}/" CHANGELOG.md
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           run_install: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        if: steps.tag-check.outputs.exists == 'false'
         with:
           node-version-file: ".node-version"
           cache: pnpm
           registry-url: "https://registry.npmjs.org"
       # Trusted Publishing and `npm stage` need a newer npm than the one Node 22 bundles.
       - name: Install latest npm
-        if: steps.tag-check.outputs.exists == 'false'
         run: |
           echo "Current npm version: $(npm -v)"
           npm install -g npm@latest
           echo "Updated npm version: $(npm -v)"
       - name: Install dependencies
-        if: steps.tag-check.outputs.exists == 'false'
         run: pnpm install --frozen-lockfile
       - name: Typecheck
-        if: steps.tag-check.outputs.exists == 'false'
         run: pnpm typecheck
       - name: Test
-        if: steps.tag-check.outputs.exists == 'false'
         run: pnpm test
       # prepack (tsup) builds dist/ again when npm packs the tarball.
       - name: Build and verify package contents
-        if: steps.tag-check.outputs.exists == 'false'
         run: |
           pnpm build
           npm pack --pack-destination "$RUNNER_TEMP"
           node .github/scripts/verify-package.mjs "$RUNNER_TEMP"/storybook-addon-canvas-comments-*.tgz
+      # Pushes only when main is still at the commit the run started on, so a
+      # commit merged in the meantime makes this fail before anything is published.
+      - name: Push the release commit and tag to main
+        if: steps.tag-check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json CHANGELOG.md
+          git commit -m "chore: release v$VERSION"
+          git tag "v$VERSION"
+          git push --atomic \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            "HEAD:refs/heads/main" "refs/tags/v$VERSION"
       # The Trusted Publisher only allows `npm stage publish`. The version stays
       # private until a maintainer approves it with 2FA (`npm stage approve`).
       - name: Stage the package on npm with provenance
-        if: steps.tag-check.outputs.exists == 'false'
         env:
-          NAME: ${{ steps.package.outputs.name }}
-          VERSION: ${{ steps.package.outputs.version }}
+          NAME: ${{ steps.version.outputs.name }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           if npm view "$NAME@$VERSION" version > /dev/null 2>&1; then
             echo "$NAME@$VERSION is already on npm"
           else
             npm stage publish --provenance --access public
           fi
-      - name: Create GitHub Release with tag
+      # The notes are this version's CHANGELOG.md section, followed by the
+      # notes GitHub generates from the merged PRs.
+      - name: Create GitHub Release
         id: create-release
-        if: steps.tag-check.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.package.outputs.version }}
-          SHA: ${{ github.event.pull_request.merge_commit_sha }}
-          PR_BODY: ${{ github.event.pull_request.body }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          RELEASE_URL=$(gh release create "v$VERSION" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "v$VERSION" \
-            --target "$SHA" \
-            --notes "$PR_BODY")
+          if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "GitHub Release v$VERSION already exists"
+            RELEASE_URL=$(gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" --json url --jq '.url')
+          else
+            awk -v heading="## $VERSION" '
+              $0 == heading { found = 1; next }
+              found && /^## / { exit }
+              found { print }
+            ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+            RELEASE_URL=$(gh release create "v$VERSION" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "v$VERSION" \
+              --verify-tag \
+              --notes-file "$RUNNER_TEMP/notes.md" \
+              --generate-notes)
+          fi
           echo "url=$RELEASE_URL" >> "$GITHUB_OUTPUT"
-      - name: Comment on PR - Success
-        if: success() && steps.tag-check.outputs.exists == 'false'
+      - name: Summary
         env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          VERSION: ${{ steps.package.outputs.version }}
-          PACKAGE_NAME: ${{ steps.package.outputs.name }}
+          VERSION: ${{ steps.version.outputs.version }}
+          PACKAGE_NAME: ${{ steps.version.outputs.name }}
           RELEASE_URL: ${{ steps.create-release.outputs.url }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body "📦 **v$VERSION is staged on npm. Approve it to publish.**
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## 📦 v$VERSION is staged on npm. Approve it to publish.
 
           Approve it in the **Staged Packages** tab of your npmjs.com account settings, or with the CLI:
 
@@ -127,17 +171,5 @@ jobs:
           \`\`\`
 
           - 🏷️ GitHub Release: $RELEASE_URL
-          - 🔗 Workflow run: $RUN_URL
-          - After approval: https://www.npmjs.com/package/$PACKAGE_NAME/v/$VERSION"
-      - name: Comment on PR - Failure
-        if: failure() && steps.tag-check.outputs.exists == 'false'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          VERSION: ${{ steps.package.outputs.version }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body "❌ **Release v$VERSION failed**
-
-          Please check the workflow logs for details.
-          🔗 Workflow run: $RUN_URL"
+          - After approval: https://www.npmjs.com/package/$PACKAGE_NAME/v/$VERSION
+          EOF

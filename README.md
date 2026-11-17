@@ -865,15 +865,14 @@ Run `pnpm build` after each change, because the consumer loads `dist/`.
 
 CI publishes to npm with [Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (OIDC), so the repository holds no npm token.
 
-1. Run the **Create Release PR** workflow from the Actions tab and pick `patch`, `minor`, or `major`.
-   It bumps `package.json`, moves the `Unreleased` notes in `CHANGELOG.md` under the new version, and opens a draft PR labeled `Type: Release`.
-   The PR body holds release notes generated since the previous release.
-2. Edit the PR body if needed. It becomes the GitHub Release notes.
-3. Mark the PR ready and merge it.
-   The **Release** workflow (`.github/workflows/release.yaml`) runs in the `npm` environment.
-   It runs the checks, stages the package on npm with provenance (`npm stage publish`), creates the `vX.Y.Z` tag and GitHub Release, and comments the result on the PR.
-   Re-running it after a release that succeeded does nothing.
-4. Approve the staged version with 2FA. Until then it is not public.
+1. Add the changes to the `Unreleased` section of `CHANGELOG.md` in the PRs that make them.
+2. Run the **Release** workflow (`.github/workflows/release.yaml`) on `main` from the Actions tab and pick `patch`, `minor`, or `major`.
+   It runs in the `npm` environment. It bumps `package.json`, moves the `Unreleased` notes in `CHANGELOG.md` under the new version, and runs the checks.
+   Then it pushes a `chore: release vX.Y.Z` commit and the `vX.Y.Z` tag to `main`, stages the package on npm with provenance (`npm stage publish`), and creates the GitHub Release.
+   The release notes are the version's `CHANGELOG.md` section followed by the notes GitHub generates from the merged PRs.
+   If a commit lands on `main` while it runs, the push fails before anything is published. Run it again.
+   Re-running a failed run after the push resumes from the tag and skips what is already done.
+3. Approve the staged version with 2FA. Until then it is not public.
    On npmjs.com, open the **Staged Packages** tab in your account settings, review the version, and click **Approve**.
    Or use the CLI (npm 11.15.0 or later):
 
@@ -882,12 +881,9 @@ CI publishes to npm with [Trusted Publishing](https://docs.npmjs.com/trusted-pub
    npm stage approve <stage-id>
    ```
 
-PRs opened by `GITHUB_TOKEN` do not trigger other workflows, so CI does not run on the release PR by itself.
-The Release workflow runs the same checks before publishing.
-
 ### One-time setup
 
-- **GitHub:** turn on **Settings → Actions → General → Allow GitHub Actions to create and approve pull requests**.
+- **GitHub:** the workflow pushes to `main` with `GITHUB_TOKEN`. If a branch protection rule or ruleset on `main` requires pull requests, the push is rejected, so let the release bypass it (for example, push with a GitHub App token that is on the ruleset's bypass list).
 - **GitHub (optional):** add required reviewers to the `npm` environment under **Settings → Environments** to approve every publish by hand.
   Protect `main` with "Require review from Code Owners" so changes to `.github/workflows/` need the owner's review (see `.github/CODEOWNERS`).
 - **npm:** a package must exist on npm before it can have a Trusted Publisher.
