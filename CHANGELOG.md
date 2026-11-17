@@ -4,7 +4,7 @@
 
 - Add a temporary mode: `npx storybook-addon-canvas-comments dev` runs the project's Storybook with the addon, without adding it to `package.json` or `.storybook/main.*`.
   It writes a config directory next to `.storybook` that loads the project's main config and adds the addon, runs the project's own `storybook dev` (or `build`) with it, and deletes it when Storybook exits.
-  `--addon-options <json>` passes the preset options, and every other option goes to Storybook.
+  `--addon-options <json|file>` passes the preset options, such as `designSystems`, as JSON or from a JSON file, and every other option goes to Storybook.
 
 ## 0.3.8
 

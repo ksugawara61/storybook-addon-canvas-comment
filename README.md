@@ -102,8 +102,32 @@ The directory has its own `.gitignore`, so git ignores it while it exists.
 
 - Every other option goes to Storybook, such as `-p 6006` or `--no-open`.
 - `-c, --config-dir <dir>` — your config directory, if it is not `.storybook`.
-- `--addon-options <json>` — the addon's preset options (`board`, [`designSystems`](#design-system-components), [`apiUrl`](#hosted-mode-cloudflare-pages--r2)), such as `'{"board":false}'`.
+- `--addon-options <json|file>` — the addon's preset options, as JSON such as `'{"board":false}'`, or the path of a JSON file that holds them.
+  They are the same options as in `main.ts`: `board`, [`designSystems`](#design-system-components) and [`apiUrl`](#hosted-mode-cloudflare-pages--r2).
 - `npx storybook-addon-canvas-comments build` runs `storybook build` the same way.
+
+The board's [design system components](#design-system-components) work too.
+Put the `designSystems` option in a JSON file, and pass its path:
+
+```json
+{
+  "designSystems": [
+    { "name": "Example UI", "importPath": "@example/ui", "titlePrefix": "UI/" },
+    { "name": "@acme/ui", "components": ["Alert", "Badge"], "args": { "Alert": { "title": "Saved" } } }
+  ]
+}
+```
+
+```bash
+npx storybook-addon-canvas-comments dev --addon-options canvas-comments.json
+```
+
+All three kinds work as with the addon installed:
+
+- `titlePrefix` lists stories in your Storybook.
+- `ref` lists the stories of a Storybook in the `refs` of your main config.
+- `components` writes stories for a [library without stories](#libraries-without-stories).
+  `"auto"` needs TypeScript installed in the project, as without the temporary mode.
 
 Comments and boards are saved to `.storybook/canvas-comments/`, as with the addon installed.
 Run the CLIs below with `npx -p storybook-addon-canvas-comments`, for example:

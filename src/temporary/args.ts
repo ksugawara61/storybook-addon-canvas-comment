@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 /** Arguments of `npx storybook-addon-canvas-comments <dev|build> [options]`. */
 export type TemporaryArgs = {
   addonOptions: Record<string, unknown>;
@@ -9,12 +12,28 @@ export type TemporaryArgs = {
 
 const COMMANDS = new Set(["build", "dev"]);
 
-const parseAddonOptions = (value: string): Record<string, unknown> => {
+/** Reads `--addon-options`: a JSON object, or the path of a JSON file that holds one. */
+const parseAddonOptions = (value: string, cwd: string): Record<string, unknown> => {
+  const isJson = value.trimStart().startsWith("{");
+  let source = value;
+  if (!isJson) {
+    try {
+      source = readFileSync(resolve(cwd, value), "utf8");
+    } catch {
+      throw new Error(
+        `--addon-options must be JSON, such as '{"board":false}', or a JSON file. Could not read ${value}.`,
+      );
+    }
+  }
   let parsed: unknown;
   try {
-    parsed = JSON.parse(value);
+    parsed = JSON.parse(source);
   } catch {
-    throw new Error(`--addon-options must be JSON, such as '{"board":false}'.`);
+    throw new Error(
+      isJson
+        ? `--addon-options must be JSON, such as '{"board":false}'.`
+        : `--addon-options: ${value} is not valid JSON.`,
+    );
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error("--addon-options must be a JSON object.");
@@ -26,7 +45,10 @@ const parseAddonOptions = (value: string): Record<string, unknown> => {
  * Reads the command, the config directory and the addon options, and keeps every other
  * argument for Storybook. `-h` is not help: it is `--host` for `storybook dev`.
  */
-export const parseTemporaryArgs = (args: string[]): TemporaryArgs | "help" => {
+export const parseTemporaryArgs = (
+  args: string[],
+  cwd: string = process.cwd(),
+): TemporaryArgs | "help" => {
   const [command, ...rest] = args;
   if (!command || command === "--help" || command === "help") {
     return "help";
@@ -66,7 +88,7 @@ export const parseTemporaryArgs = (args: string[]): TemporaryArgs | "help" => {
       index += 1;
     }
     if (name === "--addon-options") {
-      parsed.addonOptions = parseAddonOptions(value);
+      parsed.addonOptions = parseAddonOptions(value, cwd);
     } else {
       parsed.configDir = value;
     }

@@ -24,7 +24,9 @@ installed: .storybook/canvas-comments/ in the current directory.
 
 Options:
   -c, --config-dir <dir>      Your Storybook config directory. Defaults to .storybook.
-  --addon-options <json>      The addon's preset options, such as '{"board":false}'.
+  --addon-options <json|file> The addon's preset options, as JSON such as
+                              '{"board":false}', or the path of a JSON file.
+                              Use a file for designSystems.
   --help                      Show this help.
 
 Every other option is passed to Storybook, such as -p 6006 or --no-open.
@@ -32,6 +34,7 @@ Every other option is passed to Storybook, such as -p 6006 or --no-open.
 Examples:
   npx storybook-addon-canvas-comments dev -p 6006
   npx storybook-addon-canvas-comments dev --addon-options '{"board":false}'
+  npx storybook-addon-canvas-comments dev --addon-options canvas-comments.json
 `;
 
 // dist/cli/storybook.js (or src/cli/storybook.ts) → the package directory.

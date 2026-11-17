@@ -1,3 +1,6 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseTemporaryArgs } from "./args.ts";
 
@@ -36,6 +39,30 @@ describe("parseTemporaryArgs", () => {
     );
   });
 
+  it("reads the addon options from a JSON file, relative to the working directory", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "canvas-comments-args-"));
+    try {
+      const designSystems = [{ importPath: "@acme/ui", name: "Acme", titlePrefix: "UI/" }];
+      await writeFile(join(dir, "canvas-comments.json"), JSON.stringify({ designSystems }));
+      expect(
+        parseTemporaryArgs(["dev", "--addon-options", "canvas-comments.json"], dir),
+      ).toMatchObject({ addonOptions: { designSystems } });
+      await writeFile(join(dir, "broken.json"), "{");
+      expect(() => parseTemporaryArgs(["dev", "--addon-options", "broken.json"], dir)).toThrow(
+        "broken.json is not valid JSON",
+      );
+      await writeFile(join(dir, "list.json"), "[]");
+      expect(() => parseTemporaryArgs(["dev", "--addon-options", "list.json"], dir)).toThrow(
+        "must be a JSON object",
+      );
+      expect(() => parseTemporaryArgs(["dev", "--addon-options", "missing.json"], dir)).toThrow(
+        "Could not read missing.json",
+      );
+    } finally {
+      await rm(dir, { force: true, recursive: true });
+    }
+  });
+
   it("passes everything after -- to Storybook as is", () => {
     expect(parseTemporaryArgs(["dev", "--", "-c", "other", "--help"])).toMatchObject({
       configDir: ".storybook",
@@ -54,8 +81,5 @@ describe("parseTemporaryArgs", () => {
     expect(() => parseTemporaryArgs(["dev", "-c"])).toThrow("-c requires a value.");
     expect(() => parseTemporaryArgs(["dev", "-c", "-p"])).toThrow("-c requires a value.");
     expect(() => parseTemporaryArgs(["dev", "--addon-options", "{"])).toThrow("must be JSON");
-    expect(() => parseTemporaryArgs(["dev", "--addon-options", "[]"])).toThrow(
-      "must be a JSON object",
-    );
   });
 });
