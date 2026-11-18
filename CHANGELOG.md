@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.3.10
+
 - Make the peer dependencies `storybook`, `vite` and `react` optional, so `npx` and `pnpm dlx` no longer install them for the temporary mode.
   `pnpm dlx storybook-addon-canvas-comments dev` installed Storybook and Vite next to the addon, and asked whether to run the install script of their dependency esbuild.
   The temporary mode runs the project's own Storybook and Vite, so these copies were not needed.
