@@ -96,6 +96,8 @@ pnpm dlx storybook-addon-canvas-comments dev
 ```
 
 Run it where you run Storybook.
+It installs only the addon and its one small dependency, not Storybook, Vite or React: it uses the project's own.
+So `pnpm dlx` does not ask whether to run esbuild's install script.
 It writes a config directory next to yours, `.storybook-canvas-comments/`, that loads your main config and adds the addon to its `addons`.
 It then runs your project's own `storybook dev` with that directory, and deletes the directory when Storybook exits.
 The directory has its own `.gitignore`, so git ignores it while it exists.

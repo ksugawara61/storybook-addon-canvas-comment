@@ -79,7 +79,16 @@
     "vite": ">=5"
   },
   "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "storybook": {
+      "optional": true
+    },
     "typescript": {
+      "optional": true
+    },
+    "vite": {
       "optional": true
     }
   },
