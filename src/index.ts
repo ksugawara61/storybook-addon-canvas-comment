@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { fileURLToPath } from "node:url";
-import { mergeConfig, type Plugin, type UserConfig } from "vite";
+import type { Plugin, UserConfig } from "vite";
 import {
   type BoardPaths,
   createBoardPaths,
@@ -397,16 +397,20 @@ const canvasCommentsApi = (): Plugin => {
   };
 };
 
+// Merged by hand rather than with Vite's mergeConfig, so the preset never imports "vite"
+// at runtime. In the temporary mode the addon runs from the npx / pnpm dlx cache, where
+// the peer dependencies are not installed (see peerDependenciesMeta in package.json).
 export const viteFinal = async (
   config: UserConfig,
   options: CanvasCommentsPresetOptions = {},
-): Promise<UserConfig> =>
-  mergeConfig(config, {
-    define: {
-      __CANVAS_COMMENTS_API_URL__: JSON.stringify(options.apiUrl ?? ""),
-    },
-    plugins: [canvasCommentsApi()],
-  });
+): Promise<UserConfig> => ({
+  ...config,
+  define: {
+    ...config.define,
+    __CANVAS_COMMENTS_API_URL__: JSON.stringify(options.apiUrl ?? ""),
+  },
+  plugins: [...(config.plugins ?? []), canvasCommentsApi()],
+});
 
 export type { BoardFile } from "./board/board-schema.ts";
 export type { CanvasCommentsPluginOptions } from "./vite-plugin.ts";
